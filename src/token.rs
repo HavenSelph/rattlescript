@@ -14,81 +14,67 @@ impl Display for Location {
 }
 
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenKind {
+    Colon,
+    Comma,
+    Equals,
+    EOF,
+    FloatLiteral,
+    Identifier,
+    IntegerLiteral,
+    LeftBracket,
+    LeftParen,
+    Let,
+    Minus,
+    Plus,
+    RightBracket,
+    RightParen,
+    SemiColon,
+    Slash,
+    Star,
+    StringLiteral,
+}
+
 #[derive(Debug, Clone)]
-pub enum Token {
-    Colon(Location),
-    Comma(Location),
-    Equals(Location),
-    EOF(Location),
-    FloatLiteral(Location, f64),
-    Identifier(Location, String),
-    IntegerLiteral(Location, i64),
-    LeftBracket(Location),
-    LeftParen(Location),
-    Let(Location),
-    Minus(Location),
-    Plus(Location),
-    RightBracket(Location),
-    RightParen(Location),
-    SemiColon(Location),
-    Slash(Location),
-    Star(Location),
-    StringLiteral(Location, String),
+pub struct Token {
+    pub kind: TokenKind,
+    pub loc: Location,
+    pub text: String,
+    pub newline_before: bool,
 }
 
 impl Token {
-    pub fn location(&self) -> Location {
-        match self {
-            Token::Colon(loc) => loc.clone(),
-            Token::Comma(loc) => loc.clone(),
-            Token::Equals(loc) => loc.clone(),
-            Token::EOF(loc) => loc.clone(),
-            Token::FloatLiteral(loc, _) => loc.clone(),
-            Token::Identifier(loc, _) => loc.clone(),
-            Token::IntegerLiteral(loc, _) => loc.clone(),
-            Token::LeftBracket(loc) => loc.clone(),
-            Token::LeftParen(loc) => loc.clone(),
-            Token::Let(loc) => loc.clone(),
-            Token::Minus(loc) => loc.clone(),
-            Token::Plus(loc) => loc.clone(),
-            Token::RightBracket(loc) => loc.clone(),
-            Token::RightParen(loc) => loc.clone(),
-            Token::SemiColon(loc) => loc.clone(),
-            Token::Slash(loc) => loc.clone(),
-            Token::Star(loc) => loc.clone(),
-            Token::StringLiteral(loc, _) => loc.clone(),
+    pub fn new(kind: TokenKind, loc: Location, text: String) -> Token {
+        Token {
+            kind,
+            loc,
+            text,
+            newline_before: false,
         }
     }
 
-    pub fn from_str(s: String, loc: Location) -> Token {
-        match s.as_ref() {
-            "let" => Token::Let(loc),
-            _ => Token::Identifier(loc, s)
+    pub fn from_str(text: String, loc: Location) -> Token {
+        Token {
+            kind: match text.as_ref() {
+                "let" => TokenKind::Let,
+                _ => TokenKind::Identifier
+            },
+            loc,
+            text,
+            newline_before: false,
         }
     }
 }
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
-        match self {
-            Token::Colon(_) => write!(f, "Colon"),
-            Token::Comma(_) => write!(f, "Comma"),
-            Token::Equals(_) => write!(f, "Equals"),
-            Token::EOF(_) => write!(f, "EOF"),
-            Token::FloatLiteral(_, num) => write!(f, "FloatLiteral({})", num),
-            Token::Identifier(_, string) => write!(f, "Identifier({})", string),
-            Token::IntegerLiteral(_, num) => write!(f, "IntegerLiteral({})", num),
-            Token::LeftBracket(_) => write!(f, "LeftBracket"),
-            Token::LeftParen(_) => write!(f, "LeftParen"),
-            Token::Let(_) => write!(f, "Let"),
-            Token::Minus(_) => write!(f, "Minus"),
-            Token::Plus(_) => write!(f, "Plus"),
-            Token::RightBracket(_) => write!(f, "RightBracket"),
-            Token::RightParen(_) => write!(f, "RightParen"),
-            Token::SemiColon(_) => write!(f, "SemiColon"),
-            Token::Slash(_) => write!(f, "Slash"),
-            Token::Star(_) => write!(f, "Star"),
-            Token::StringLiteral(_, string) => write!(f, "StringLiteral({})", string),
+        match self.kind {
+            TokenKind::IntegerLiteral => write!(f, "IntegerLiteral({})", self.text),
+            TokenKind::FloatLiteral => write!(f, "FloatLiteral({})", self.text),
+            TokenKind::StringLiteral => write!(f, "StringLiteral({})", self.text),
+            TokenKind::Identifier => write!(f, "Identifier({})", self.text),
+            _ => write!(f, "{:?}", self.kind)
         }
     }
 }
