@@ -31,6 +31,10 @@ impl Lexer {
         self.input.chars().nth(self.current_index)
     }
 
+    fn peek(&self, offset: usize) -> Option<char> {
+        self.input.chars().nth(self.current_index + offset)
+    }
+
     fn increment(&mut self) {
         match self.cur() {
             Some('\n') => {
@@ -107,7 +111,10 @@ impl Lexer {
                 '[' => self.push_simple(&mut tokens, TokenKind::LeftBracket, 1),
                 ']' => self.push_simple(&mut tokens, TokenKind::RightBracket, 1),
                 ':' => self.push_simple(&mut tokens, TokenKind::Colon, 1),
-                '=' => self.push_simple(&mut tokens, TokenKind::Equals, 1),
+                '=' => match self.peek(1) {
+                    Some('>') => self.push_simple(&mut tokens, TokenKind::FatArrow, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::Equals, 1),
+                }
                 ';' => self.push_simple(&mut tokens, TokenKind::SemiColon, 1),
                 ',' => self.push_simple(&mut tokens, TokenKind::Comma, 1),
                 '{' => self.push_simple(&mut tokens, TokenKind::LeftBrace, 1),
