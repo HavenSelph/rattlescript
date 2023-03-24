@@ -1,80 +1,19 @@
-use std::fmt::{Display, Error};
-
-#[derive(Debug, Clone)]
-pub struct Location {
-    line: usize,
-    column: usize,
-    filename: String
-}
-
-impl Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}:{}:{}", self.filename, self.line, self.column)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Token {
-    IntegerLiteral(Location, i64),
-    FloatLiteral(Location, f64),
-    StringLiteral(Location, String),
-    Plus(Location),
-    Minus(Location),
-    Star(Location),
-    Slash(Location),
-    LeftParen(Location),
-    RightParen(Location),
-    LeftBracket(Location),
-    RightBracket(Location),
-    Colon(Location),
-    EOF(Location),
-}
-
-impl Token {
-    pub fn location(&self) -> Location {
-        match self {
-            Token::IntegerLiteral(loc, _) => loc.clone(),
-            Token::FloatLiteral(loc, _) => loc.clone(),
-            Token::StringLiteral(loc, _) => loc.clone(),
-            Token::Plus(loc) => loc.clone(),
-            Token::Minus(loc) => loc.clone(),
-            Token::Star(loc) => loc.clone(),
-            Token::Slash(loc) => loc.clone(),
-            Token::LeftParen(loc) => loc.clone(),
-            Token::RightParen(loc) => loc.clone(),
-            Token::LeftBracket(loc) => loc.clone(),
-            Token::RightBracket(loc) => loc.clone(),
-            Token::Colon(loc) => loc.clone(),
-            Token::EOF(loc) => loc.clone(),
-        }
-    }
-}
-
-impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
-        match self {
-            Token::IntegerLiteral(_, num) => write!(f, "IntegerLiteral({})", num),
-            Token::FloatLiteral(_, num) => write!(f, "FloatLiteral({})", num),
-            Token::StringLiteral(_, string) => write!(f, "StringLiteral({})", string),
-            Token::Plus(_) => write!(f, "Plus"),
-            Token::Minus(_) => write!(f, "Minus"),
-            Token::Star(_) => write!(f, "Star"),
-            Token::Slash(_) => write!(f, "Slash"),
-            Token::LeftParen(_) => write!(f, "LeftParen"),
-            Token::RightParen(_) => write!(f, "RightParen"),
-            Token::LeftBracket(_) => write!(f, "LeftBracket"),
-            Token::RightBracket(_) => write!(f, "RightBracket"),
-            Token::Colon(_) => write!(f, "Colon"),
-            Token::EOF(_) => write!(f, "EOF"),
-        }
-    }
-}
+use crate::token::{Location, Token};
 
 #[derive(Debug)]
 pub struct Lexer {
-    location: Location,
-    input: String,
-    current_index: usize
+    pub location: Location,
+    pub input: String,
+    pub current_index: usize
+}
+
+macro_rules! push_single {
+    ($self:ident, $tokens:ident, $type:path) => {
+        {
+            $tokens.push($type($self.location.clone()));
+            $self.increment();
+        }
+    }
 }
 
 impl Lexer {
@@ -147,47 +86,33 @@ impl Lexer {
                         tokens.push(Token::IntegerLiteral(loc, num.parse().unwrap()));
                     }
                 }
-                '+' => {
-                    tokens.push(Token::Plus(self.location.clone()));
-                    self.increment();
-                }
-                '-' => {
-                    tokens.push(Token::Minus(self.location.clone()));
-                    self.increment();
-                }
-                '*' => {
-                    tokens.push(Token::Star(self.location.clone()));
-                    self.increment();
-                }
-                '/' => {
-                    tokens.push(Token::Slash(self.location.clone()));
-                    self.increment();
-                }
-                '(' => {
-                    tokens.push(Token::LeftParen(self.location.clone()));
-                    self.increment();
-                }
-                ')' => {
-                    tokens.push(Token::RightParen(self.location.clone()));
-                    self.increment();
-                }
-                '[' => {
-                    tokens.push(Token::LeftBracket(self.location.clone()));
-                    self.increment();
-                }
-                ']' => {
-                    tokens.push(Token::RightBracket(self.location.clone()));
-                    self.increment();
-                }
-                ':' => {
-                    tokens.push(Token::Colon(self.location.clone()));
-                    self.increment();
-                }
-                '"' => {
-                    tokens.push(self.lex_string_literal());
-                }
-                ' ' => {
-                    self.increment();
+                ' ' | '\t' | '\r' | '\n' => self.increment(),
+                '+' => push_single!(self, tokens, Token::Plus),
+                '-' => push_single!(self, tokens, Token::Minus),
+                '*' => push_single!(self, tokens, Token::Star),
+                '/' => push_single!(self, tokens, Token::Slash),
+                '(' => push_single!(self, tokens, Token::LeftParen),
+                ')' => push_single!(self, tokens, Token::RightParen),
+                '[' => push_single!(self, tokens, Token::LeftBracket),
+                ']' => push_single!(self, tokens, Token::RightBracket),
+                ':' => push_single!(self, tokens, Token::Colon),
+                '=' => push_single!(self, tokens, Token::Equals),
+                ';' => push_single!(self, tokens, Token::SemiColon),
+                ',' => push_single!(self, tokens, Token::Comma),
+                '"' => tokens.push(self.lex_string_literal()),
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    let loc = self.location.clone();
+                    let mut ident = String::new();
+                    while let Some(c) = self.cur() {
+                        match c {
+                            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
+                                ident.push(c);
+                                self.increment();
+                            }
+                            _ => break
+                        }
+                    }
+                    tokens.push(Token::from_str(ident, loc));
                 }
                 _ => {
                     panic!("Unexpected character: {}", c);
