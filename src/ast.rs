@@ -17,7 +17,7 @@ pub enum AST {
     StringLiteral(Location, String),
     VarDeclaration(Location, String, Arc<AST>),
     Variable(Location, String),
-    Function{loc: Location, name: String, args: Vec<String>, body: Arc<AST>},
+    Function{loc: Location, name: Option<String>, args: Vec<String>, body: Arc<AST>},
     Return(Location, Arc<AST>),
     Assignment(Location, Arc<AST>, Arc<AST>),
 }

@@ -74,6 +74,25 @@ impl Parser {
         }
     }
 
+    fn parse_lambda(&mut self) -> Arc<AST> {
+        let loc = self.consume(TokenKind::Pipe).loc.clone();
+        let mut args = vec![];
+        while self.cur().kind != TokenKind::Pipe {
+            args.push(self.consume(TokenKind::Identifier).text);
+            if self.cur().kind == TokenKind::Comma {
+                self.increment();
+            }
+        }
+        self.increment();
+        let body = if self.cur().kind == TokenKind::FatArrow {
+            self.increment();
+            Arc::new(AST::Return(loc.clone(), self.parse_expression()))
+        } else {
+            self.parse_block(/*global*/ false)
+        };
+        Arc::new(AST::Function { loc, name: None, args, body })
+    }
+
     fn parse_function(&mut self) -> (Arc<AST>, String) {
         let loc = self.consume(TokenKind::Def).loc.clone();
         let name = self.consume(TokenKind::Identifier);
@@ -93,7 +112,7 @@ impl Parser {
             self.parse_block(/*global*/ false)
         };
         self.consume_line_end();
-        (Arc::new(AST::Function { loc, name: name.text.clone(), args, body }), name.text)
+        (Arc::new(AST::Function { loc, name: Some(name.text.clone()), args, body }), name.text)
     }
 
     fn parse_statement(&mut self) -> Arc<AST> {
@@ -272,6 +291,9 @@ impl Parser {
                     },
                     _ => error!("{}: Expected ')'", self.cur().loc)
                 }
+            }
+            Token { kind: TokenKind::Pipe, .. } => {
+                self.parse_lambda()
             }
             Token { kind: TokenKind::IntegerLiteral, loc, text, ..} => {
                 self.increment();

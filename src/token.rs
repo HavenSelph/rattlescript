@@ -31,6 +31,7 @@ pub enum TokenKind {
     LeftBrace,
     Let,
     Minus,
+    Pipe,
     Plus,
     Return,
     RightBracket,

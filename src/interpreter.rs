@@ -264,7 +264,12 @@ impl Interpreter {
                     body: body.clone(),
                     scope: scope.clone()
                 };
-                scope.lock().unwrap().insert(name.clone(), func.clone(), false);
+                match name {
+                    Some(name) => {
+                        scope.lock().unwrap().insert(name.clone(), func.clone(), false);
+                    },
+                    None => {}
+                }
                 func
             },
             AST::Return(loc, val) => {

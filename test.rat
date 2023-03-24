@@ -28,3 +28,8 @@ sub(5, 6)
 @deco("multiplication")
 def mul(a, b) => a * b
 mul(3,2)
+
+let multiply = |a, b| { return a / b; }
+
+let divide = deco("division")(|a, b| => a / b)
+divide(4,2)

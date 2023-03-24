@@ -110,6 +110,7 @@ impl Lexer {
                 ')' => self.push_simple(&mut tokens, TokenKind::RightParen, 1),
                 '[' => self.push_simple(&mut tokens, TokenKind::LeftBracket, 1),
                 ']' => self.push_simple(&mut tokens, TokenKind::RightBracket, 1),
+                '|' => self.push_simple(&mut tokens, TokenKind::Pipe, 1),
                 ':' => self.push_simple(&mut tokens, TokenKind::Colon, 1),
                 '=' => match self.peek(1) {
                     Some('>') => self.push_simple(&mut tokens, TokenKind::FatArrow, 2),
