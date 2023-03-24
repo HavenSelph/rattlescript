@@ -16,8 +16,10 @@ impl Display for Location {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
+    At,
     Colon,
     Comma,
+    Def,
     Equals,
     EOF,
     FloatLiteral,
@@ -25,11 +27,14 @@ pub enum TokenKind {
     IntegerLiteral,
     LeftBracket,
     LeftParen,
+    LeftBrace,
     Let,
     Minus,
     Plus,
+    Return,
     RightBracket,
     RightParen,
+    RightBrace,
     SemiColon,
     Slash,
     Star,
@@ -58,6 +63,8 @@ impl Token {
         Token {
             kind: match text.as_ref() {
                 "let" => TokenKind::Let,
+                "def" => TokenKind::Def,
+                "return" => TokenKind::Return,
                 _ => TokenKind::Identifier
             },
             loc,
