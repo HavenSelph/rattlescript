@@ -22,6 +22,7 @@ pub enum TokenKind {
     Def,
     Equals,
     EOF,
+    FatArrow,
     FloatLiteral,
     Identifier,
     IntegerLiteral,

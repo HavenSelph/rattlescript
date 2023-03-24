@@ -86,9 +86,14 @@ impl Parser {
             }
         }
         self.increment();
-        let body = self.parse_block(/*global*/ false);
+        let body = if self.cur().kind == TokenKind::FatArrow {
+            self.increment();
+            Arc::new(AST::Return(loc.clone(), self.parse_expression()))
+        } else {
+            self.parse_block(/*global*/ false)
+        };
         self.consume_line_end();
-        (Arc::new(AST::Function{loc, name: name.text.clone(), args, body}), name.text)
+        (Arc::new(AST::Function { loc, name: name.text.clone(), args, body }), name.text)
     }
 
     fn parse_statement(&mut self) -> Arc<AST> {

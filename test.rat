@@ -23,3 +23,8 @@ def sub(a, b) {
 
 add(3, 4)
 sub(5, 6)
+
+
+@deco("multiplication")
+def mul(a, b) => a * b
+mul(3,2)
