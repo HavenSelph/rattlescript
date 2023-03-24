@@ -1,6 +1,25 @@
-let x = 1+2
-let y = 3+4
-let z = x+y
-let test = "HelloWorld"[0:10:2]
-print(x, y, z, test)
-print(len(("Hello"*100)[::2]))
+
+def deco(foo) {
+    def wrapper(func) {
+        def inner(a, b) {
+            print(foo, "input", a, b)
+            let res = func(a, b)
+            print(foo, "output", res)
+        }
+        return inner
+    }
+    return wrapper
+}
+
+@deco("      a d d i t i o n "[::2][3:])
+def add(a, b) {
+    return a + b
+}
+
+@deco("subtract"+"ion")
+def sub(a, b) {
+    return a - b
+}
+
+add(3, 4)
+sub(5, 6)

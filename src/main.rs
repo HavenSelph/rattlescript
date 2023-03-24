@@ -28,6 +28,6 @@ fn main() {
     let mut parser = parser::Parser::new(tokens);
     let ast = parser.parse();
     let mut interpreter = interpreter::Interpreter::new();
-    interpreter.run(&ast);
+    interpreter.execute(&ast);
 }
 

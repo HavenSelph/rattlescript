@@ -110,6 +110,9 @@ impl Lexer {
                 '=' => self.push_simple(&mut tokens, TokenKind::Equals, 1),
                 ';' => self.push_simple(&mut tokens, TokenKind::SemiColon, 1),
                 ',' => self.push_simple(&mut tokens, TokenKind::Comma, 1),
+                '{' => self.push_simple(&mut tokens, TokenKind::LeftBrace, 1),
+                '}' => self.push_simple(&mut tokens, TokenKind::RightBrace, 1),
+                '@' => self.push_simple(&mut tokens, TokenKind::At, 1),
                 '"' => {
                     let token = self.lex_string_literal();
                     self.push(&mut tokens, token);

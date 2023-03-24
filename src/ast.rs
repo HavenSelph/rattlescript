@@ -1,20 +1,25 @@
+use std::sync::Arc;
+
 use crate::token::Location;
 
 #[derive(Debug)]
 pub enum AST {
-    Call(Location, Box<AST>, Vec<Box<AST>>),
-    Block(Location, Vec<Box<AST>>),
-    Divide(Location, Box<AST>, Box<AST>),
+    Call(Location, Arc<AST>, Vec<Arc<AST>>),
+    Block(Location, Vec<Arc<AST>>),
+    Divide(Location, Arc<AST>, Arc<AST>),
     FloatLiteral(Location, f64),
-    Index(Location, Box<AST>, Box<AST>),
+    Index(Location, Arc<AST>, Arc<AST>),
     IntegerLiteral(Location, i64),
-    Minus(Location, Box<AST>, Box<AST>),
-    Multiply(Location, Box<AST>, Box<AST>),
-    Plus(Location, Box<AST>, Box<AST>),
-    Slice{loc: Location, lhs: Box<AST>, start:Option<Box<AST>>, end:Option<Box<AST>>, step:Option<Box<AST>>},
+    Minus(Location, Arc<AST>, Arc<AST>),
+    Multiply(Location, Arc<AST>, Arc<AST>),
+    Plus(Location, Arc<AST>, Arc<AST>),
+    Slice{loc: Location, lhs: Arc<AST>, start:Option<Arc<AST>>, end:Option<Arc<AST>>, step:Option<Arc<AST>>},
     StringLiteral(Location, String),
-    VarDeclaration(Location, String, Box<AST>),
+    VarDeclaration(Location, String, Arc<AST>),
     Variable(Location, String),
+    Function{loc: Location, name: String, args: Vec<String>, body: Arc<AST>},
+    Return(Location, Arc<AST>),
+    Assignment(Location, Arc<AST>, Arc<AST>),
 }
 
 impl AST {
@@ -34,6 +39,9 @@ impl AST {
             AST::StringLiteral(loc, _) => loc.clone(),
             AST::VarDeclaration(loc, _, _) => loc.clone(),
             AST::Variable(loc, _) => loc.clone(),
+            AST::Function{loc, ..} => loc.clone(),
+            AST::Return(loc, _) => loc.clone(),
+            AST::Assignment(loc, _, _) => loc.clone(),
         }
     }
 }
