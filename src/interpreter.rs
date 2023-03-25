@@ -91,6 +91,7 @@ impl Interpreter {
         }
     }
 
+
     pub fn run(&mut self, ast: &Rc<AST>, scope: Ref<Scope>) -> Result<Value> {
         macro_rules! dispatch_op {
             ($loc:expr, $op:path, $left:expr, $right:expr) => {{
