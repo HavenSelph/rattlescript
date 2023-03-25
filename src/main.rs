@@ -54,71 +54,64 @@ impl Args {
     fn get_args() -> Args {
         let args: Vec<String> = std::env::args().collect();
         if args.len() == 1 {
-            Args {
+            return Args {
                 repl: true,
                 file: None,
                 code: None,
-            }
-        } else {
-            let mut repl = None;
-            let mut file = None;
-            let mut code = None;
-            let mut i: usize = 1;
-            while i < args.len() {
-                let item = &args[i];
-                match item.as_str() {
-                    "--repl" | "-r" => {
-                        repl = match repl {
-                            Some(_) => {
-                                println!("Bad usage of repl param.");
-                                println!("Usage: rattlesnake [file] [args]");
-                                exit(1);
-                            }
-                            None => Some(true),
-                        }
-                    }
-                    "--file" | "-f" => {
-                        file = match file {
-                            Some(_) => {
-                                println!("Multiple usages of file param.");
-                                println!("Usage: rattlesnake [file] [args]");
-                                exit(1);
-                            }
-                            None => {
-                                i += 1;
-                                Some(args[i].clone())
-                            }
-                        };
-                    }
-                    "--code" | "-c" => {
-                        code = match code {
-                            Some(_) => {
-                                println!("Multiple usages of code param.");
-                                println!("Usage: rattlesnake [file] [args]");
-                                exit(1);
-                            }
-                            None => {
-                                i += 1;
-                                Some(args[i].clone())
-                            }
-                        };
-                    }
-                    _ if !(item.starts_with('-') || item.starts_with("--")) && i == 1 => {
-                        file = Some(item.clone());
-                    }
-                    _ => {
-                        println!("Unknown argument \"{}\".", item);
+            };
+        }
+
+        let mut repl = None;
+        let mut file = None;
+        let mut code = None;
+        let mut i: usize = 1;
+        while i < args.len() {
+            let item = &args[i];
+            match item.as_str() {
+                "--repl" | "-r" => {
+                    repl = if repl.is_some() {
+                        println!("Bad usage of repl param.");
                         println!("Usage: rattlesnake [file] [args]");
                         exit(1);
+                    } else {
+                        Some(true)
                     }
                 }
-                i += 1;
+                "--file" | "-f" => {
+                    file = if file.is_some() {
+                        println!("Multiple usages of file param.");
+                        println!("Usage: rattlesnake [file] [args]");
+                        exit(1);
+                    } else {
+                        i += 1;
+                        Some(args[i].clone())
+                    };
+                }
+                "--code" | "-c" => {
+                    code = if code.is_some() {
+                        println!("Multiple usages of code param.");
+                        println!("Usage: rattlesnake [file] [args]");
+                        exit(1);
+                    } else {
+                        i += 1;
+                        Some(args[i].clone())
+                    };
+                }
+                _ if !(item.starts_with('-') || item.starts_with("--")) && i == 1 => {
+                    file = Some(item.clone());
+                }
+                _ => {
+                    println!("Unknown argument \"{}\".", item);
+                    println!("Usage: rattlesnake [file] [args]");
+                    exit(1);
+                }
             }
-            Args {
-                repl: repl.unwrap_or(false),
-                file,
-                code,
-            }
+            i += 1;
+        }
+        Args {
+            repl: repl.unwrap_or(false),
+            file,
+            code,
         }
     }
 }
