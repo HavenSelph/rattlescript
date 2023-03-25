@@ -26,4 +26,10 @@ pub enum AST {
     StringLiteral(Location, String),
     VarDeclaration(Location, String, Arc<AST>),
     Variable(Location, String),
+    Equals(Location, Arc<AST>, Arc<AST>),
+    NotEquals(Location, Arc<AST>, Arc<AST>),
+    LessThan(Location, Arc<AST>, Arc<AST>),
+    GreaterThan(Location, Arc<AST>, Arc<AST>),
+    LessThanEquals(Location, Arc<AST>, Arc<AST>),
+    GreaterThanEquals(Location, Arc<AST>, Arc<AST>),
 }

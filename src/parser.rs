@@ -179,15 +179,44 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self) -> Arc<AST> {
-        let left = self.parse_logical_or();
+        let left = self.parse_comparison();
         match self.cur() {
             Token { kind: TokenKind::Equals, loc, ..} => {
                 self.increment();
-                let right = self.parse_logical_or();
+                let right = self.parse_comparison();
                 Arc::new(AST::Assignment(loc, left, right))
             }
             _ => left
         }
+    }
+
+    fn parse_comparison(&mut self) -> Arc<AST> {
+        let mut left = self.parse_logical_or();
+        loop {
+            match self.cur() {
+                Token { kind: TokenKind::EqualsEquals
+                            | TokenKind::BangEquals
+                            | TokenKind::LessThan
+                            | TokenKind::GreaterThan
+                            | TokenKind::LessThanEquals
+                            | TokenKind::GreaterThanEquals, loc, ..} => {
+                    let op = self.cur().kind;
+                    self.increment();
+                    let right = self.parse_logical_or();
+                    left = match op {
+                        TokenKind::EqualsEquals => Arc::new(AST::Equals(loc, left, right)),
+                        TokenKind::BangEquals => Arc::new(AST::NotEquals(loc, left, right)),
+                        TokenKind::LessThan => Arc::new(AST::LessThan(loc, left, right)),
+                        TokenKind::GreaterThan => Arc::new(AST::GreaterThan(loc, left, right)),
+                        TokenKind::LessThanEquals => Arc::new(AST::LessThanEquals(loc, left, right)),
+                        TokenKind::GreaterThanEquals => Arc::new(AST::GreaterThanEquals(loc, left, right)),
+                        _ => unreachable!()
+                    }
+                },
+                _ => break
+            }
+        }
+        return left
     }
 
     fn parse_logical_or(&mut self) -> Arc<AST> {

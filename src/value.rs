@@ -18,7 +18,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn add(self, other: Value, loc: &Location) -> Value {
+    pub fn plus(self, other: Value, loc: &Location) -> Value {
         match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left + right),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 + right),
@@ -29,7 +29,7 @@ impl Value {
         }
     }
 
-    pub fn subtract(self, other: Value, loc: &Location) -> Value {
+    pub fn minus(self, other: Value, loc: &Location) -> Value {
         match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left - right),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
@@ -86,4 +86,70 @@ impl Value {
             _ => error!("{loc}: Can only slice strings")
         }
     }
+
+
+    pub fn not(self, loc: &Location) -> Value {
+        match self {
+            Value::Boolean(b) => Value::Boolean(!b),
+            _ => error!("{loc}: Invalid type for not")
+        }
+    }
+    pub fn and(self, other: Value, loc: &Location) -> Value {
+        match (self, other) {
+            (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left && right),
+            _ => error!("{loc}: Invalid types for and")
+        }
+    }
+    pub fn or(self, other: Value, loc: &Location) -> Value {
+        match (self, other) {
+            (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left || right),
+            _ => error!("{loc}: Invalid types for or")
+        }
+    }
+
+    pub fn equals(self, other: Value, _loc: &Location) -> Value {
+        match (self, other) {
+            (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left == right),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean(left as f64 == right),
+            (Value::Float(left), Value::Float(right)) => Value::Boolean(left == right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left == right as f64),
+            (Value::String(left), Value::String(right)) => Value::Boolean(left == right),
+            (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left == right),
+            _ => Value::Boolean(false)
+        }
+    }
+    pub fn not_equals(self, other: Value, loc: &Location) -> Value {
+        match self.equals(other, loc) {
+            Value::Boolean(b) => Value::Boolean(!b),
+            _ => unreachable!("equals should always return a boolean")
+        }
+    }
+    pub fn less_than(self, other: Value, loc: &Location) -> Value {
+        match (self, other) {
+            (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left < right),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) < right),
+            (Value::Float(left), Value::Float(right)) => Value::Boolean(left < right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left < right as f64),
+            (Value::String(left), Value::String(right)) => Value::Boolean(left < right),
+            _ => error!("{loc}: Invalid types for less than")
+        }
+    }
+
+    pub fn greater_than(self, other: Value, loc: &Location) -> Value {
+        other.less_than(self, loc)
+    }
+    pub fn less_than_equals(self, other: Value, loc: &Location) -> Value {
+        match (self, other) {
+            (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left <= right),
+            (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) <= right),
+            (Value::Float(left), Value::Float(right)) => Value::Boolean(left <= right),
+            (Value::Float(left), Value::Integer(right)) => Value::Boolean(left <= right as f64),
+            (Value::String(left), Value::String(right)) => Value::Boolean(left <= right),
+            _ => error!("{loc}: Invalid types for less than")
+        }
+    }
+    pub fn greater_than_equals(self, other: Value, loc: &Location) -> Value {
+        other.less_than_equals(self, loc)
+    }
+
 }

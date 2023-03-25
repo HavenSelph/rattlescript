@@ -124,7 +124,20 @@ impl Lexer {
                 ':' => self.push_simple(&mut tokens, TokenKind::Colon, 1),
                 '=' => match self.peek(1) {
                     Some('>') => self.push_simple(&mut tokens, TokenKind::FatArrow, 2),
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::EqualsEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Equals, 1),
+                }
+                '<' => match self.peek(1) {
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::LessThanEquals, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::LessThan, 1),
+                }
+                '>' => match self.peek(1) {
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::GreaterThanEquals, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::GreaterThan, 1),
+                }
+                '!' => match self.peek(1) {
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::BangEquals, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::Bang, 1),
                 }
                 ';' => self.push_simple(&mut tokens, TokenKind::SemiColon, 1),
                 ',' => self.push_simple(&mut tokens, TokenKind::Comma, 1),

@@ -77,6 +77,24 @@ impl Interpreter {
     }
 
     fn run(&mut self, ast: &Arc<AST>, scope: &mut Ref<Scope>) -> Value {
+
+        macro_rules! dispatch_op {
+            ($loc:expr, $op:path, $left:expr, $right:expr) => {
+                {
+                    let left = self.run($left, scope);
+                    let right = self.run($right, scope);
+                    $op(left, right, $loc)
+                }
+            };
+
+            ($loc:expr, $op:path, $val:expr) => {
+                {
+                    let val = self.run($val, scope);
+                    $op(val, $loc)
+                }
+            };
+        }
+
         match ast.as_ref() {
             AST::Block(_, stmts) => {
                 let mut last = Value::Nothing;
@@ -137,19 +155,6 @@ impl Interpreter {
                     _ => error!("{loc}: Can't assign to {:?}", lhs)
                 }
             },
-            AST::Not(loc, expr) => {
-                Value::Boolean(!self.get_boolean_value(scope, loc, expr))
-            }
-            AST::And(loc, left, right) => {
-                let left = self.get_boolean_value(scope, loc, left);
-                let right = self.get_boolean_value(scope, loc, right);
-                Value::Boolean(left && right)
-            }
-            AST::Or(loc, left, right) => {
-                let left = self.get_boolean_value(scope, loc, left);
-                let right = self.get_boolean_value(scope, loc, right);
-                Value::Boolean(left || right)
-            }
             AST::Index(loc, left, right) => {
                 let left = self.run(left, scope);
                 let right = self.run(right, scope);
@@ -172,26 +177,23 @@ impl Interpreter {
                 }
                 error!("{loc}: Variable {} not found", name)
             },
-            AST::Plus(loc, left, right) => {
-                let left = self.run(left, scope);
-                let right = self.run(right, scope);
-                left.add(right, loc)
-            },
-            AST::Minus(loc, left, right) => {
-                let left = self.run(left, scope);
-                let right = self.run(right, scope);
-                left.subtract(right, loc)
-            },
-            AST::Multiply(loc, left, right) => {
-                let left = self.run(left, scope);
-                let right = self.run(right, scope);
-                left.multiply(right, loc)
-            },
-            AST::Divide(loc, left, right) => {
-                let left = self.run(left, scope);
-                let right = self.run(right, scope);
-                left.divide(right, loc)
-            },
+
+            AST::Plus(loc, left, right) => dispatch_op!(loc, Value::plus, left, right),
+            AST::Minus(loc, left, right) => dispatch_op!(loc, Value::minus, left, right),
+            AST::Multiply(loc, left, right) => dispatch_op!(loc, Value::multiply, left, right),
+            AST::Divide(loc, left, right) => dispatch_op!(loc, Value::divide, left, right),
+
+            AST::Not(loc, expr) => dispatch_op!(&loc, Value::not, expr),
+            AST::And(loc, left, right) => dispatch_op!(loc, Value::and, left, right),
+            AST::Or(loc, left, right) => dispatch_op!(loc, Value::or, left, right),
+
+            AST::Equals(loc, left, right) => dispatch_op!(loc, Value::equals, left, right),
+            AST::NotEquals(loc, left, right) => dispatch_op!(loc, Value::not_equals, left, right),
+            AST::LessThan(loc, left, right) => dispatch_op!(loc, Value::less_than, left, right),
+            AST::GreaterThan(loc, left, right) => dispatch_op!(loc, Value::greater_than, left, right),
+            AST::LessThanEquals(loc, left, right) => dispatch_op!(loc, Value::less_than_equals, left, right),
+            AST::GreaterThanEquals(loc, left, right) => dispatch_op!(loc, Value::greater_than_equals, left, right),
+
             AST::Slice {loc, lhs, start, end, step} => {
                 let lhs = self.run(lhs, scope);
                 let start = start.clone().map(|start| self.run(&start, scope));
@@ -256,13 +258,6 @@ impl Interpreter {
                 value
             }
             _ => error!("{loc}: Can't call object {:?}", func)
-        }
-    }
-
-    fn get_boolean_value(&mut self, scope: &mut Ref<Scope>, loc: &Location, val: &Arc<AST>) -> bool {
-        match self.run(val, scope) {
-            Value::Boolean(b) => b,
-            _ => error!("{loc}: Expected boolean value")
         }
     }
 }

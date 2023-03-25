@@ -58,16 +58,17 @@ print(not true)
 
 print(nothing)
 
-//if boo == foo {
+print(1==2, 1!=2, 1<2, 1>2, 1<=2, 1>=2)
+// if boo == foo {
 //    print("boo == foo")
-//} else {
+// } else {
 //    print("boo != foo")
-//}
-//
-//if 1 < 2 {
+// }
+
+// if 1 < 2 {
 //    print("1 < 2")
-//}
-//
-//if 2 >= 1 {
+// }
+
+// if 2 >= 1 {
 //    print("2 >= 1")
-//}
+// }
