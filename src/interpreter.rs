@@ -64,9 +64,7 @@ macro_rules! builtins {
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let builtins =
-            builtins!(print, len, exit);
-
+        let builtins = builtins!(print, len, exit);
         Interpreter {
             builtins,
             control_flow: ControlFlow::None,
@@ -94,8 +92,8 @@ impl Interpreter {
                     }
                 }
                 Ok(last)
-            },
-            _ => unreachable!("run_block_without_scope called on non-block")
+            }
+            _ => unreachable!("run_block_without_scope called on non-block"),
         }
     }
 

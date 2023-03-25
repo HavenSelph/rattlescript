@@ -1,6 +1,8 @@
-use crate::error::{Result, Error};
-use crate::interpreter::{Ref, Scope, Interpreter};
 use crate::ast::AST;
+use crate::error::{Error, Result};
+use crate::interpreter::{Interpreter, Ref, Scope};
+use crate::value::Value;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write;
 use std::rc::Rc;
@@ -22,7 +24,7 @@ impl Repl {
         }));
         Repl {
             interpreter,
-            global_scope
+            global_scope,
         }
     }
 
@@ -32,7 +34,9 @@ impl Repl {
             let mut temp = String::new();
             print!("{}", if input.is_empty() { ">>> " } else { "... " });
             std::io::stdout().flush().expect("Failed to flush stdout");
-            std::io::stdin().read_line(&mut temp).expect("Failed to read line");
+            std::io::stdin()
+                .read_line(&mut temp)
+                .expect("Failed to read line");
             if temp.trim().is_empty() {
                 break self.try_parse(input.clone())?;
             }
@@ -43,9 +47,11 @@ impl Repl {
                 Err(e) => return Err(e),
             }
         };
-        let val = self.interpreter.run_block_without_scope(&ast, self.global_scope.clone())?;
+        let val = self
+            .interpreter
+            .run_block_without_scope(&ast, self.global_scope.clone())?;
         match val {
-            Value::Nothing => {},
+            Value::Nothing => {}
             _ => println!("{}", val.repr()),
         }
         Ok(())
@@ -62,7 +68,7 @@ impl Repl {
     pub fn run(&mut self) {
         loop {
             match self.run_once() {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     println!("{:?}", e);
                 }
