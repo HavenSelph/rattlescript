@@ -7,6 +7,7 @@ mod utils;
 mod token;
 mod interpreter;
 mod builtins;
+mod value;
 
 fn main() {
     // get filename from args or printout usage, optionally take file content from stdin if arg is "-"

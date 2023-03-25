@@ -1,4 +1,4 @@
-use crate::interpreter::Value;
+use crate::value::Value;
 use crate::token::Location;
 use crate::utils::error;
 

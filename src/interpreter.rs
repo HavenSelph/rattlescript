@@ -2,6 +2,7 @@ use crate::ast::AST;
 use crate::token::Location;
 use crate::utils::error;
 use crate::builtins;
+use crate::value::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -42,7 +43,7 @@ impl Scope {
 }
 
 type BuiltInFunctionType = fn(&Location, Vec<Value>) -> Value;
-type Ref<T> = Arc<Mutex<T>>;
+pub type Ref<T> = Arc<Mutex<T>>;
 
 enum ControlFlowDecision {
     None,
@@ -174,75 +175,29 @@ impl Interpreter {
             AST::Plus(loc, left, right) => {
                 let left = self.run(left, scope);
                 let right = self.run(right, scope);
-                match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => Value::Integer(left + right),
-                    (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 + right),
-                    (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
-                    (Value::Float(left), Value::Integer(right)) => Value::Float(left + right as f64),
-                    (Value::String(left), Value::String(right)) => Value::String(left + &right),
-                    _ => error!("{loc}: Invalid types for addition")
-                }
+                left.add(right, loc)
             },
             AST::Minus(loc, left, right) => {
                 let left = self.run(left, scope);
                 let right = self.run(right, scope);
-                match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => Value::Integer(left - right),
-                    (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
-                    (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
-                    (Value::Float(left), Value::Integer(right)) => Value::Float(left - right as f64),
-                    _ => error!("{loc}: Invalid types for subtraction")
-                }
+                left.subtract(right, loc)
             },
             AST::Multiply(loc, left, right) => {
                 let left = self.run(left, scope);
                 let right = self.run(right, scope);
-                match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => Value::Integer(left * right),
-                    (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 * right),
-                    (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
-                    (Value::Float(left), Value::Integer(right)) => Value::Float(left * right as f64),
-                    (Value::String(left), Value::Integer(right)) => {
-                        if right < 0 { error!("{loc}: {right} is not a positive integer.") }
-                        Value::String(left.repeat(right as usize))
-                    }
-                    _ => error!("{loc}: Invalid types for multiplication")
-                }
+                left.multiply(right, loc)
             },
             AST::Divide(loc, left, right) => {
                 let left = self.run(left, scope);
                 let right = self.run(right, scope);
-                match (left, right) {
-                    (Value::Integer(left), Value::Integer(right)) => Value::Integer(left / right),
-                    (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 / right),
-                    (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
-                    (Value::Float(left), Value::Integer(right)) => Value::Float(left / right as f64),
-                    _ => error!("{loc}: Invalid types for division")
-                }
+                left.divide(right, loc)
             },
             AST::Slice {loc, lhs, start, end, step} => {
                 let lhs = self.run(lhs, scope);
-                match lhs {
-                    Value::String(s) => {
-                        let start = if let Some(start) = start { self.run(start, scope) } else { Value::Integer(0) };
-                        let end = if let Some(end) = end { self.run(end, scope) } else { Value::Integer(s.len() as i64) };
-                        let step = if let Some(step) = step { self.run(step, scope) } else { Value::Integer(1) };
-                        match (start, end, step) {
-                            (Value::Integer(start), Value::Integer(end), Value::Integer(step)) => {
-                                if step == 0 { error!("{loc}: Step cannot be 0") }
-                                let mut result = String::new();
-                                let mut i = start;
-                                while i < end {
-                                    result.push(s.chars().nth(i as usize).unwrap());
-                                    i += step;
-                                }
-                                Value::String(result)
-                            },
-                            _ => error!("{loc}: Invalid types for slice")
-                        }
-                    },
-                    _ => error!("{loc}: Can only slice strings")
-                }
+                let start = start.clone().map(|start| self.run(&start, scope));
+                let end = end.clone().map(|end| self.run(&end, scope));
+                let step = step.clone().map(|step| self.run(&step, scope));
+                lhs.slice(start, end, step, loc)
             }
             AST::Function { name, args, body, .. } => {
                 let func = Value::Function{
