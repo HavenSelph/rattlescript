@@ -526,13 +526,52 @@ impl Parser {
                 ..
             } => self.parse_lambda(),
             Token {
-                kind: TokenKind::IntegerLiteral,
+                kind: TokenKind::IntegerLiteralDec,
                 loc,
                 text,
                 ..
             } => {
                 self.increment();
                 if let Ok(num) = text.parse::<i64>() {
+                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                } else {
+                    error!(loc, "Invalid integer literal: {}", text);
+                }
+            }
+            Token {
+                kind: TokenKind::IntegerLiteralBin,
+                loc,
+                text,
+                ..
+            } => {
+                self.increment();
+                if let Ok(num) = i64::from_str_radix(&text, 2) {
+                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                } else {
+                    error!(loc, "Invalid integer literal: {}", text);
+                }
+            }
+            Token {
+                kind: TokenKind::IntegerLiteralOct,
+                loc,
+                text,
+                ..
+            } => {
+                self.increment();
+                if let Ok(num) = i64::from_str_radix(&text, 8) {
+                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                } else {
+                    error!(loc, "Invalid integer literal: {}", text);
+                }
+            }
+            Token {
+                kind: TokenKind::IntegerLiteralHex,
+                loc,
+                text,
+                ..
+            } => {
+                self.increment();
+                if let Ok(num) = i64::from_str_radix(&text, 16) {
                     Ok(Rc::new(AST::IntegerLiteral(loc, num)))
                 } else {
                     error!(loc, "Invalid integer literal: {}", text);

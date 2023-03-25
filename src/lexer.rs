@@ -72,24 +72,51 @@ impl Lexer {
         while let Some(c) = self.cur() {
             match c {
                 c if c.is_whitespace() => self.increment(),
+
+                // base N literals, i.e. 0b_1101, 0o_567, 0x_ff
+                '0' if self.peek(1).map_or(false, |c| "box".contains(c)) => {
+                    let mut num = String::new();
+
+                    let base = match self.peek(1) {
+                        Some('b') => Base::Bin,
+                        Some('o') => Base::Oct,
+                        Some('x') => Base::Hex,
+                        _ => Base::Dec,
+                    };
+
+                    self.increment();
+                    self.increment();
+
+                    self.lex_num(&mut num, base)?;
+                    self.push(
+                        &mut tokens,
+                        Token::new(base.into(), self.location.clone(), num),
+                    );
+                }
+
+                // decimal int/float literals
                 '0'..='9' => {
                     let loc = self.location.clone();
                     let mut num = String::new();
-                    self.lex_num(&mut num);
+
+                    self.lex_num(&mut num, Base::Dec)?;
                     if let Some('.') = self.cur() {
                         if let Some('.') = self.peek(1) {
                             self.push(
                                 &mut tokens,
-                                Token::new(TokenKind::IntegerLiteral, loc.clone(), num),
+                                Token::new(TokenKind::IntegerLiteralDec, loc.clone(), num),
                             );
                         } else {
                             num.push('.');
                             self.increment();
-                            self.lex_num(&mut num);
+                            self.lex_num(&mut num, Base::Dec)?;
                             self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
                         }
                     } else {
-                        self.push(&mut tokens, Token::new(TokenKind::IntegerLiteral, loc, num));
+                        self.push(
+                            &mut tokens,
+                            Token::new(TokenKind::IntegerLiteralDec, loc, num),
+                        );
                     }
                 }
                 '+' => self.push_simple(&mut tokens, TokenKind::Plus, 1),
@@ -142,6 +169,8 @@ impl Lexer {
                     Some('.') => self.push_simple(&mut tokens, TokenKind::DotDot, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Dot, 1),
                 },
+
+                // identifiers
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let loc = self.location.clone();
                     let mut ident = String::new();
@@ -185,16 +214,43 @@ impl Lexer {
         Ok(Token::new(TokenKind::StringLiteral, loc, string))
     }
 
-    fn lex_num(&mut self, num: &mut String) {
-        while let Some(c) = self.cur() {
-            match c {
-                '0'..='9' => {
+    fn lex_num(&mut self, num: &mut String, base: Base) -> Result<()> {
+        while let Some(mut c) = self.cur() {
+            c = c.to_ascii_lowercase();
+            match (base, c) {
+                (Base::Bin, '0'..='1')
+                | (Base::Oct, '0'..='7')
+                | (Base::Dec, '0'..='9')
+                | (Base::Hex, '0'..='9' | 'a'..='f') => {
                     num.push(c);
                     self.increment();
                 }
-                '_' => self.increment(),
+                (_, '0'..='9' | 'a'..='f') => {
+                    error!(self.location, "Invalid numerical literal");
+                }
+                (_, '_') => self.increment(),
                 _ => break,
             }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Base {
+    Bin,
+    Oct,
+    Dec,
+    Hex,
+}
+
+impl From<Base> for TokenKind {
+    fn from(value: Base) -> Self {
+        match value {
+            Base::Bin => Self::IntegerLiteralBin,
+            Base::Oct => Self::IntegerLiteralOct,
+            Base::Dec => Self::IntegerLiteralDec,
+            Base::Hex => Self::IntegerLiteralHex,
         }
     }
 }
