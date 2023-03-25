@@ -1,10 +1,46 @@
 use std::sync::Arc;
+use std::rc::Rc;
+use std::cell::RefCell;
 use crate::token::Location;
 use crate::ast::AST;
 use crate::interpreter::{Scope, Ref};
 use crate::utils::error;
 
+use std::fmt::{Debug, Formatter};
 
+#[derive(Clone)]
+pub struct IteratorValue(pub Rc<RefCell<dyn Iterator<Item=Value>>>);
+
+struct StringIterator {
+    string: String,
+    index: usize,
+}
+
+impl Iterator for StringIterator {
+    type Item = Value;
+
+    fn next(&mut self) -> Option<Value> {
+        if self.index >= self.string.len() {
+            None
+        } else {
+            let c = self.string.chars().nth(self.index).unwrap();
+            self.index += 1;
+            Some(Value::String(c.to_string()))
+        }
+    }
+}
+
+impl IteratorValue {
+    pub fn for_string(string: String) -> IteratorValue {
+        IteratorValue(Rc::new(RefCell::new(StringIterator {string, index: 0})))
+    }
+}
+
+impl Debug for IteratorValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Iterator")
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -13,9 +49,11 @@ pub enum Value {
     String(String),
     Boolean(bool),
     BuiltInFunction(String),
+    Iterator(IteratorValue),
     Function{body: Arc<AST>, args: Vec<String>, scope: Ref<Scope>},
     Nothing,
 }
+
 
 impl Value {
     pub fn plus(self, other: Value, loc: &Location) -> Value {
@@ -152,4 +190,10 @@ impl Value {
         other.less_than_equals(self, loc)
     }
 
+    pub fn iterator(self, _loc: &Location) -> Value {
+        match self {
+            Value::String(s) => Value::Iterator(IteratorValue::for_string(s)),
+            _ => self
+        }
+    }
 }

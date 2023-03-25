@@ -176,6 +176,14 @@ impl Parser {
                 let body = self.parse_block(/*global*/ false);
                 Arc::new(AST::While(loc, cond, body))
             }
+            Token { kind: TokenKind::For, loc, ..} => {
+                self.increment();
+                let ident = self.consume(TokenKind::Identifier);
+                self.consume(TokenKind::In);
+                let expr = self.parse_expression();
+                let body = self.parse_block(/*global*/ false);
+                Arc::new(AST::For(loc, ident.text, expr, body))
+            }
             Token { kind: TokenKind::Return, loc, ..} => {
                 self.increment();
                 let expr = self.parse_expression();

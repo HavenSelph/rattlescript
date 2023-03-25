@@ -36,4 +36,5 @@ pub enum AST {
     While(Location, Arc<AST>, Arc<AST>),
     Continue(Location),
     Break(Location),
+    For(Location, String, Arc<AST>, Arc<AST>),
 }

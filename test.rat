@@ -72,3 +72,8 @@ while n < 10 {
     b = c
     n = n + 1
 }
+
+
+for x in "hello" {
+    print(x)
+}

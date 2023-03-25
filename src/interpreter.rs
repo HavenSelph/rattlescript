@@ -2,10 +2,9 @@ use crate::ast::AST;
 use crate::token::Location;
 use crate::utils::error;
 use crate::builtins;
-use crate::value::Value;
+use crate::value::{Value, IteratorValue};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-
 
 #[derive(Debug, Clone)]
 pub struct Scope {
@@ -152,6 +151,34 @@ impl Interpreter {
                 }
                 Value::Nothing
             },
+            AST::For(loc, loop_var, iter, body) => {
+                let iter = self.run(iter, scope.clone()).iterator(loc);
+                match iter {
+                    Value::Iterator(IteratorValue(iter)) => {
+                        let iter = &mut *(*iter).borrow_mut();
+                        for val in iter {
+                            let mut loop_scope = Scope {
+                                vars: HashMap::new(),
+                                parent: Some(scope.clone()),
+                                in_function: scope.lock().unwrap().in_function,
+                            };
+                            loop_scope.insert(loop_var.clone(), val.clone(), false, loc);
+                            self.run(body, Arc::new(Mutex::new(loop_scope)));
+                            match self.control_flow {
+                                ControlFlowDecision::None => {},
+                                ControlFlowDecision::Continue => self.control_flow = ControlFlowDecision::None,
+                                ControlFlowDecision::Break => {
+                                    self.control_flow = ControlFlowDecision::None;
+                                    break;
+                                },
+                                ControlFlowDecision::Return(_) => break,
+                            }
+                        }
+                    }
+                    _ => error!(loc, "For loop must iterate over an iterable")
+                }
+                Value::Nothing
+            }
             AST::BooleanLiteral(_, value) => Value::Boolean(*value),
             AST::IntegerLiteral(_, num) => Value::Integer(*num),
             AST::FloatLiteral(_, num) => Value::Float(*num),
