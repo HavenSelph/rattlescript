@@ -4,7 +4,7 @@ use std::fmt::{Display, Error};
 pub struct Location {
     pub line: usize,
     pub column: usize,
-    pub filename: String
+    pub filename: String,
 }
 
 impl Display for Location {
@@ -12,7 +12,6 @@ impl Display for Location {
         write!(f, "{}:{}:{}", self.filename, self.line, self.column)
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
@@ -26,7 +25,7 @@ pub enum TokenKind {
     Def,
     Dot,
     DotDot,
-    EOF,
+    Eof,
     Else,
     Equals,
     EqualsEquals,
@@ -104,7 +103,7 @@ impl Token {
                 "break" => TokenKind::Break,
                 "for" => TokenKind::For,
                 "in" => TokenKind::In,
-                _ => TokenKind::Identifier
+                _ => TokenKind::Identifier,
             },
             loc,
             text,
@@ -120,7 +119,7 @@ impl Display for Token {
             TokenKind::FloatLiteral => write!(f, "FloatLiteral({})", self.text),
             TokenKind::StringLiteral => write!(f, "StringLiteral({})", self.text),
             TokenKind::Identifier => write!(f, "Identifier({})", self.text),
-            _ => write!(f, "{:?}", self.kind)
+            _ => write!(f, "{:?}", self.kind),
         }
     }
 }
