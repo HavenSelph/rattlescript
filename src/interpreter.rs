@@ -65,7 +65,6 @@ macro_rules! builtins {
 impl Interpreter {
     pub fn new() -> Interpreter {
         let builtins = builtins!(print, len, exit);
-
         Interpreter {
             builtins,
             control_flow: ControlFlow::None,
@@ -97,6 +96,7 @@ impl Interpreter {
             _ => unreachable!("run_block_without_scope called on non-block"),
         }
     }
+
 
     pub fn run(&mut self, ast: &Rc<AST>, scope: Ref<Scope>) -> Result<Value> {
         macro_rules! dispatch_op {
