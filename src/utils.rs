@@ -7,7 +7,6 @@ macro_rules! error {
             let filename = &$loc.filename;
             let file_content = std::fs::read_to_string(filename).expect("couldn't open input file");
             let lines = file_content.lines().collect::<Vec<&str>>();
-
             let context = 3;
             let min_line = if $loc.line <= context {
                 1

@@ -78,7 +78,7 @@ impl Interpreter {
         self.run(ast, scope.clone())
     }
 
-    fn run(&mut self, ast: &Arc<AST>, scope: Ref<Scope>) -> Value {
+    pub fn run(&mut self, ast: &Arc<AST>, scope: Ref<Scope>) -> Value {
 
         macro_rules! dispatch_op {
             ($loc:expr, $op:path, $left:expr, $right:expr) => {

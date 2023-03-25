@@ -34,7 +34,7 @@ let multiply = |a, b| { return a / b; }
 let divide = deco("division")(|a, b| => a / b)
 divide(4,2)
 
-let boo = false
+let boo = true
 let not_boo = true
 
 assert boo == false, "failed"

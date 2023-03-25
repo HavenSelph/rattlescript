@@ -1,0 +1,374 @@
+    Checking rattlesnake v0.1.0 (/Users/mustafa/git/rattlesnake)
+warning: this `else { if .. }` block can be collapsed
+  --> src/interpreter.rs:20:16
+   |
+20 |           } else {
+   |  ________________^
+21 | |             if self.vars.contains_key(&name) {
+22 | |                 self.vars.insert(name, value);
+23 | |             } else {
+...  |
+28 | |             }
+29 | |         }
+   | |_________^
+   |
+   = note: `#[warn(clippy::collapsible_else_if)]` on by default
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_else_if
+help: collapse nested if block
+   |
+20 ~         } else if self.vars.contains_key(&name) {
+21 +             self.vars.insert(name, value);
+22 +         } else {
+23 +             match &self.parent {
+24 +                 Some(parent) => parent.lock().unwrap().insert(name, value, update, loc),
+25 +                 None => error!(loc, "Variable {} not found, couldn't update", name),
+26 +             }
+27 +         }
+   |
+
+warning: unneeded `return` statement
+   --> src/lexer.rs:170:9
+    |
+170 |         return tokens;
+    |         ^^^^^^^^^^^^^^ help: remove `return`: `tokens`
+    |
+    = note: `#[warn(clippy::needless_return)]` on by default
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+
+warning: redundant clone
+  --> src/parser.rs:35:16
+   |
+35 |             res.clone()
+   |                ^^^^^^^^ help: remove this
+   |
+   = note: `#[warn(clippy::redundant_clone)]` on by default
+note: this value is dropped without further use
+  --> src/parser.rs:35:13
+   |
+35 |             res.clone()
+   |             ^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+  --> src/parser.rs:48:33
+   |
+48 |         let loc = self.cur().loc.clone();
+   |                                 ^^^^^^^^ help: remove this
+   |
+note: this value is dropped without further use
+  --> src/parser.rs:48:19
+   |
+48 |         let loc = self.cur().loc.clone();
+   |                   ^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+  --> src/parser.rs:78:52
+   |
+78 |         let loc = self.consume(TokenKind::Pipe).loc.clone();
+   |                                                    ^^^^^^^^ help: remove this
+   |
+note: this value is dropped without further use
+  --> src/parser.rs:78:19
+   |
+78 |         let loc = self.consume(TokenKind::Pipe).loc.clone();
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+  --> src/parser.rs:97:51
+   |
+97 |         let loc = self.consume(TokenKind::Def).loc.clone();
+   |                                                   ^^^^^^^^ help: remove this
+   |
+note: this value is dropped without further use
+  --> src/parser.rs:97:19
+   |
+97 |         let loc = self.consume(TokenKind::Def).loc.clone();
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+   --> src/parser.rs:157:28
+    |
+157 |                         loc.clone(),
+    |                            ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/parser.rs:157:25
+    |
+157 |                         loc.clone(),
+    |                         ^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: unneeded `return` statement
+   --> src/parser.rs:256:9
+    |
+256 |         return left
+    |         ^^^^^^^^^^^ help: remove `return`: `left`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+
+warning: this loop could be written as a `while let` loop
+   --> src/parser.rs:232:9
+    |
+232 | /         loop {
+233 | |             match self.cur() {
+234 | |                 Token { kind: TokenKind::EqualsEquals
+235 | |                             | TokenKind::BangEquals
+...   |
+254 | |             }
+255 | |         }
+    | |_________^
+    |
+    = note: `#[warn(clippy::while_let_loop)]` on by default
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop
+help: try
+    |
+232 ~         while let Token { kind: TokenKind::EqualsEquals
+233 +                             | TokenKind::BangEquals
+234 +                             | TokenKind::LessThan
+235 +                             | TokenKind::GreaterThan
+236 +                             | TokenKind::LessThanEquals
+237 +                             | TokenKind::GreaterThanEquals, loc, ..} = self.cur() { .. }
+    |
+
+warning: unneeded `return` statement
+   --> src/parser.rs:271:9
+    |
+271 |         return left
+    |         ^^^^^^^^^^^ help: remove `return`: `left`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+
+warning: this loop could be written as a `while let` loop
+   --> src/parser.rs:261:9
+    |
+261 | /         loop {
+262 | |             match self.cur() {
+263 | |                 Token { kind: TokenKind::Or, loc, ..} => {
+264 | |                     self.increment();
+...   |
+269 | |             }
+270 | |         }
+    | |_________^ help: try: `while let Token { kind: TokenKind::Or, loc, ..} = self.cur() { .. }`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop
+
+warning: unneeded `return` statement
+   --> src/parser.rs:286:9
+    |
+286 |         return left
+    |         ^^^^^^^^^^^ help: remove `return`: `left`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+
+warning: this loop could be written as a `while let` loop
+   --> src/parser.rs:276:9
+    |
+276 | /         loop {
+277 | |             match self.cur() {
+278 | |                 Token { kind: TokenKind::And, loc, ..} => {
+279 | |                     self.increment();
+...   |
+284 | |             }
+285 | |         }
+    | |_________^ help: try: `while let Token { kind: TokenKind::And, loc, ..} = self.cur() { .. }`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#while_let_loop
+
+warning: redundant clone
+   --> src/parser.rs:337:41
+    |
+337 |                 let loc = self.cur().loc.clone();
+    |                                         ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/parser.rs:337:27
+    |
+337 |                 let loc = self.cur().loc.clone();
+    |                           ^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: matching on `Some` with `ok()` is redundant
+   --> src/parser.rs:424:17
+    |
+424 |                 if let Some(num) = text.parse::<i64>().ok() {
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(clippy::match_result_ok)]` on by default
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_result_ok
+help: consider matching on `Ok(num)` and removing the call to `ok` instead
+    |
+424 |                 if let Ok(num) = text.parse::<i64>() {
+    |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+warning: matching on `Some` with `ok()` is redundant
+   --> src/parser.rs:432:17
+    |
+432 |                 if let Some(num) = text.parse::<f64>().ok() {
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_result_ok
+help: consider matching on `Ok(num)` and removing the call to `ok` instead
+    |
+432 |                 if let Ok(num) = text.parse::<f64>() {
+    |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+warning: name `EOF` contains a capitalized acronym
+  --> src/token.rs:27:5
+   |
+27 |     EOF,
+   |     ^^^ help: consider making the acronym lowercase, except the initial letter (notice the capitalization): `Eof`
+   |
+   = note: `#[warn(clippy::upper_case_acronyms)]` on by default
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms
+
+warning: you are deriving `PartialEq` and can implement `Eq`
+  --> src/token.rs:17:24
+   |
+17 | #[derive(Debug, Clone, PartialEq)]
+   |                        ^^^^^^^^^ help: consider deriving `Eq` as well: `PartialEq, Eq`
+   |
+   = note: `#[warn(clippy::derive_partial_eq_without_eq)]` on by default
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#derive_partial_eq_without_eq
+
+warning: usage of `contains_key` followed by `insert` on a `HashMap`
+  --> src/interpreter.rs:21:13
+   |
+21 | /             if self.vars.contains_key(&name) {
+22 | |                 self.vars.insert(name, value);
+23 | |             } else {
+24 | |                 match &self.parent {
+...  |
+27 | |                 }
+28 | |             }
+   | |_____________^
+   |
+   = note: `#[warn(clippy::map_entry)]` on by default
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#map_entry
+help: try this
+   |
+21 ~             if let std::collections::hash_map::Entry::Occupied(mut e) = self.vars.entry(name) {
+22 +                 e.insert(value);
+23 +             } else {
+24 +                 match &self.parent {
+25 +                     Some(parent) => parent.lock().unwrap().insert(name, value, update, loc),
+26 +                     None => error!(loc, "Variable {} not found, couldn't update", name),
+27 +                 }
+28 +             }
+   |
+
+warning: you are using an explicit closure for cloning elements
+  --> src/interpreter.rs:34:13
+   |
+34 |             self.vars.get(name).map(|v| v.clone())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider calling the dedicated `cloned` method: `self.vars.get(name).cloned()`
+   |
+   = note: `#[warn(clippy::map_clone)]` on by default
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#map_clone
+
+warning: redundant clone
+  --> src/interpreter.rs:77:28
+   |
+77 |         self.run(ast, scope.clone())
+   |                            ^^^^^^^^ help: remove this
+   |
+note: this value is dropped without further use
+  --> src/interpreter.rs:77:23
+   |
+77 |         self.run(ast, scope.clone())
+   |                       ^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+   --> src/interpreter.rs:122:65
+    |
+122 |                     Value::Boolean(true) => self.run(body, scope.clone()),
+    |                                                                 ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/interpreter.rs:122:60
+    |
+122 |                     Value::Boolean(true) => self.run(body, scope.clone()),
+    |                                                            ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+   --> src/interpreter.rs:125:73
+    |
+125 | ...                   Some(else_body) => self.run(else_body, scope.clone()),
+    |                                                                   ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/interpreter.rs:125:68
+    |
+125 | ...                   Some(else_body) => self.run(else_body, scope.clone()),
+    |                                                              ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+   --> src/interpreter.rs:216:50
+    |
+216 |                 let right = self.run(right, scope.clone());
+    |                                                  ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/interpreter.rs:216:45
+    |
+216 |                 let right = self.run(right, scope.clone());
+    |                                             ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant clone
+   --> src/interpreter.rs:232:33
+    |
+232 |                     return value.clone()
+    |                                 ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/interpreter.rs:232:28
+    |
+232 |                     return value.clone()
+    |                            ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+
+warning: redundant pattern matching, consider using `is_none()`
+   --> src/interpreter.rs:202:32
+    |
+202 |                         if let None = scope.lock().unwrap().get(name) {
+    |                         -------^^^^---------------------------------- help: try this: `if scope.lock().unwrap().get(name).is_none()`
+    |
+    = note: `#[warn(clippy::redundant_pattern_matching)]` on by default
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+
+warning: redundant pattern matching, consider using `is_some()`
+   --> src/interpreter.rs:228:24
+    |
+228 |                 if let Some(_) = self.builtins.get(name) {
+    |                 -------^^^^^^^-------------------------- help: try this: `if self.builtins.get(name).is_some()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/interpreter.rs:242:49
+    |
+242 |             AST::Not(loc, expr) => dispatch_op!(&loc, Value::not, expr),
+    |                                                 ^^^^ help: change this to: `loc`
+    |
+    = note: `#[warn(clippy::needless_borrow)]` on by default
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrow
+
+warning: writing `&Vec` instead of `&[_]` involves a new object where a slice will do
+   --> src/interpreter.rs:299:89
+    |
+299 |     fn handle_call(&mut self, scope: Ref<Scope>, loc: &Location, func: &Arc<AST>, args: &Vec<Arc<AST>>) -> Value {
+    |                                                                                         ^^^^^^^^^^^^^^ help: change this to: `&[Arc<AST>]`
+    |
+    = note: `#[warn(clippy::ptr_arg)]` on by default
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#ptr_arg
+
+warning: `rattlesnake` (bin "rattlesnake") generated 29 warnings
+    Finished dev [unoptimized + debuginfo] target(s) in 0.82s
