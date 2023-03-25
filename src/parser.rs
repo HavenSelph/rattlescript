@@ -469,7 +469,6 @@ impl Parser {
                 } => {
                     self.increment();
                     let mut args = vec![];
-                    // TODO: refactor
                     loop {
                         match self.cur().kind {
                             TokenKind::RightParen => {
