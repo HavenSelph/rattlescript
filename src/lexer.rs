@@ -1,5 +1,5 @@
 use crate::token::{Location, Token, TokenKind};
-use crate::utils::{lexer_error as error, Error, Result};
+use crate::utils::{lexer_error as error, Result};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -21,19 +21,6 @@ impl Lexer {
             current_index: 0,
             seen_newline: false,
         }
-    }
-
-    pub fn from_file(filename: String) -> Result<Lexer> {
-        let input = match std::fs::read_to_string(filename.clone()) {
-            Ok(input) => input,
-            Err(e) => {
-                return Err(Error::Other(format!(
-                    "Failed to read file: {}: {:?}",
-                    filename, e
-                )))
-            }
-        };
-        Ok(Lexer::new(input, filename))
     }
 
     fn cur(&self) -> Option<char> {

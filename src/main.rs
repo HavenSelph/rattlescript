@@ -86,26 +86,25 @@ impl Args {
 
 fn main() -> Result<()> {
     let args = Args::get_args();
-    if args.repl && args.file.is_none() {
-        unimplemented!("Repl is not implemented yet.")
-    } else if args.file.is_some() && !args.repl && args.code.is_none() {
-        let mut lex = lexer::Lexer::from_file(args.file.unwrap())?;
-        let tokens = lex.lex()?;
-        let mut parser = parser::Parser::new(tokens);
-        let ast = parser.parse()?;
-        let mut interpreter = interpreter::Interpreter::new();
-        interpreter.execute(&ast)?;
-    } else if args.code.is_some() && args.file.is_none() {
-        let mut lex = lexer::Lexer::new(args.code.unwrap(), String::from("<string>"));
-        let tokens = lex.lex()?;
-        let mut parser = parser::Parser::new(tokens);
-        let ast = parser.parse()?;
-        let mut interpreter = interpreter::Interpreter::new();
-        interpreter.execute(&ast)?;
-    } else {
-        println!("Bad arguments passed");
-        println!("Usage: rattlesnake [file] [args]");
+    if args.repl && args.file.is_some() {
+        println!("Cannot run file and repl at the same time.");
         exit(1);
+    } else if args.file.is_some() && args.code.is_some() {
+        println!("Cannot run file and pass --code or -c at the same time.");
+        exit(1);
+    }
+    if args.repl {
+        unimplemented!()
+    } else if args.file.is_some() {
+        let file = std::fs::read_to_string(args.file.clone().unwrap()).unwrap();
+        let mut lex = lexer::Lexer::new(file,args.file.unwrap());
+        let tokens = lex.lex()?;
+        let mut parser = parser::Parser::new(tokens);
+        let ast = parser.parse()?;
+        let mut interpreter = interpreter::Interpreter::new();
+        interpreter.execute(&ast)?;
+    } else if args.code.is_some() {
+        unimplemented!()
     }
     Ok(())
 }

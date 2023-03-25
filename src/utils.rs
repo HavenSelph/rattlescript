@@ -1,5 +1,6 @@
 use crate::token::Location;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Error {
     Lexer(Location, String),
