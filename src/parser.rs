@@ -34,7 +34,7 @@ impl Parser {
             self.increment();
             res.clone()
         } else {
-            error!("{}: Expected token {:?}, but got {:?}", self.cur().loc, kind, self.cur().kind);
+            error!(self.cur().loc, "Expected token {:?}, but got {:?}", kind, self.cur().kind);
         }
     }
 
@@ -70,7 +70,7 @@ impl Parser {
         match self.cur().kind {
             TokenKind::SemiColon => self.increment(),
             TokenKind::EOF => {}
-            _ => error!("{}: Expected line end, but got {:?}", self.cur().loc, self.cur().kind),
+            _ => error!(self.cur().loc, "Expected line end, but got {:?}", self.cur().kind),
         }
     }
 
@@ -321,7 +321,7 @@ impl Parser {
                             continue;
 
                         } else {
-                            error!("{}: Cannot have empty index", loc);
+                            error!(loc, "Cannot have empty index");
                         }
                     }
 
@@ -353,7 +353,7 @@ impl Parser {
                                 match self.cur().kind {
                                     TokenKind::Comma => self.increment(),
                                     TokenKind::RightParen => {}
-                                    _ => error!("{}: Expected `)` or `,` but got {:?}", self.cur().loc, self.cur().kind)
+                                    _ => error!(self.cur().loc, "Expected `)` or `,` but got {:?}", self.cur().kind)
                                 }
                             }
                         }
@@ -376,7 +376,7 @@ impl Parser {
                         self.increment();
                         expr
                     },
-                    _ => error!("{}: Expected ')'", self.cur().loc)
+                    _ => error!(self.cur().loc, "Expected `)` but got {:?}", self.cur().kind)
                 }
             }
             Token { kind: TokenKind::Pipe, .. } => {
@@ -387,7 +387,7 @@ impl Parser {
                 if let Some(num) = text.parse::<i64>().ok() {
                     Arc::new(AST::IntegerLiteral(loc, num))
                 } else {
-                    error!("{}: Invalid integer literal: {}", loc, text);
+                    error!(loc, "Invalid integer literal: {}", text);
                 }
             },
             Token { kind: TokenKind::FloatLiteral, loc, text, ..} => {
@@ -395,7 +395,7 @@ impl Parser {
                 if let Some(num) = text.parse::<f64>().ok() {
                     Arc::new(AST::FloatLiteral(loc, num))
                 } else {
-                    error!("{}: Invalid float literal: {}", loc, text);
+                    error!(loc, "Invalid float literal: {}", text);
                 }
             },
             Token { kind: TokenKind::StringLiteral, loc, text, ..} => {
@@ -418,7 +418,7 @@ impl Parser {
                 self.increment();
                 Arc::new(AST::Nothing(loc))
             },
-            _ => error!("{}: Unexpected token in parse_atom: {}", self.cur().loc, self.cur())
+            _ => error!(self.cur().loc, "Unexpected token in parse_atom: {}", self.cur())
         }
     }
 }

@@ -15,7 +15,7 @@ pub struct Scope {
 }
 
 impl Scope {
-    fn insert(&mut self, name: String, value: Value, update: bool) {
+    fn insert(&mut self, name: String, value: Value, update: bool, loc: &Location) {
         if !update {
             self.vars.insert(name, value);
         } else {
@@ -23,8 +23,8 @@ impl Scope {
                 self.vars.insert(name, value);
             } else {
                 match &self.parent {
-                    Some(parent) => parent.lock().unwrap().insert(name, value, update),
-                    None => error!("Variable {} not found, couldn't update", name),
+                    Some(parent) => parent.lock().unwrap().insert(name, value, update, loc),
+                    None => error!(loc, "Variable {} not found, couldn't update", name),
                 }
             }
         }
@@ -120,7 +120,7 @@ impl Interpreter {
                             None => Value::Nothing,
                         }
                     },
-                    _ => error!("{loc}: If condition must be a boolean")
+                    _ => error!(loc, "If condition must be a boolean")
                 }
             },
             AST::BooleanLiteral(_, value) => Value::Boolean(*value),
@@ -128,15 +128,15 @@ impl Interpreter {
             AST::FloatLiteral(_, num) => Value::Float(*num),
             AST::StringLiteral(_, string) => Value::String(string.clone()),
             AST::Nothing(_) => Value::Nothing,
-            AST::VarDeclaration(_, name, value) => {
+            AST::VarDeclaration(loc, name, value) => {
                 if scope.lock().unwrap().vars.contains_key(name) {
-                    error!("Variable {} already exists in scope", name)
+                    error!(loc, "Variable {} already exists in scope", name)
                 }
                 if self.builtins.contains_key(name) {
-                    error!("`{}` is a built-in function, can't be used as a variable", name)
+                    error!(loc, "`{}` is a built-in function, can't be used as a variable", name)
                 }
                 let value = self.run(value, scope);
-                scope.lock().unwrap().insert(name.clone(), value.clone(), false);
+                scope.lock().unwrap().insert(name.clone(), value.clone(), false, loc);
                 value
             },
             AST::Assignment(loc, lhs, value) => {
@@ -144,15 +144,15 @@ impl Interpreter {
                 match lhs.as_ref() {
                     AST::Variable(loc, name) => {
                         if let None = scope.lock().unwrap().get(name) {
-                            error!("{loc}: Variable {} doesn't exist", name)
+                            error!(loc, "Variable {} doesn't exist", name)
                         }
                         if self.builtins.contains_key(name) {
-                            error!("{loc}: `{}` is a built-in function, can't override it", name)
+                            error!(loc, "`{}` is a built-in function, can't override it", name)
                         }
-                        scope.lock().unwrap().insert(name.clone(), value.clone(), true);
+                        scope.lock().unwrap().insert(name.clone(), value.clone(), true, loc);
                         value
                     },
-                    _ => error!("{loc}: Can't assign to {:?}", lhs)
+                    _ => error!(loc, "Can't assign to {:?}", lhs)
                 }
             },
             AST::Index(loc, left, right) => {
@@ -162,10 +162,10 @@ impl Interpreter {
                     (Value::String(left), Value::Integer(right)) => {
                         match left.chars().nth(*right as usize) {
                             Some(c) => Value::String(c.to_string()),
-                            None => error!("{loc}: Index out of bounds")
+                            None => error!(loc, "Index out of bounds")
                         }
                     },
-                    _ => error!("{loc}: Can't index {:?} with {:?}", left, right)
+                    _ => error!(loc, "Can't index {:?} with {:?}", left, right)
                 }
             },
             AST::Variable(loc, name) => {
@@ -175,7 +175,7 @@ impl Interpreter {
                 if let Some(value) = scope.lock().unwrap().get(name) {
                     return value.clone()
                 }
-                error!("{loc}: Variable {} not found", name)
+                error!(loc, "Variable {} not found", name)
             },
 
             AST::Plus(loc, left, right) => dispatch_op!(loc, Value::plus, left, right),
@@ -201,7 +201,7 @@ impl Interpreter {
                 let step = step.clone().map(|step| self.run(&step, scope));
                 lhs.slice(start, end, step, loc)
             }
-            AST::Function { name, args, body, .. } => {
+            AST::Function { name, args, body, loc, .. } => {
                 let func = Value::Function{
                     args: args.clone(),
                     body: body.clone(),
@@ -209,7 +209,7 @@ impl Interpreter {
                 };
                 match name {
                     Some(name) => {
-                        scope.lock().unwrap().insert(name.clone(), func.clone(), false);
+                        scope.lock().unwrap().insert(name.clone(), func.clone(), false, loc);
                     },
                     None => {}
                 }
@@ -217,7 +217,7 @@ impl Interpreter {
             },
             AST::Return(loc, val) => {
                 if !scope.lock().unwrap().in_function {
-                    error!("{loc}: Return statement outside of function")
+                    error!(loc, "Return statement outside of function")
                 }
                 self.control_flow = ControlFlowDecision::Return(self.run(val, scope));
                 Value::Nothing
@@ -236,17 +236,17 @@ impl Interpreter {
                     None => unreachable!("{loc}: Built-in function {:?} not found", func)
                 }
             }
-            Value::Function{ body, args: func_args, scope: closure_scope } => {
+            Value::Function{ body, args: func_args, scope: closure_scope, .. } => {
                 let mut new_scope = Arc::new(Mutex::new(Scope {
                     vars: HashMap::new(),
                     parent: Some(closure_scope.clone()),
                     in_function: true,
                 }));
                 if args.len() != func_args.len() {
-                    error!("{loc}: Expected {} arguments, got {}", func_args.len(), args.len())
+                    error!(loc, "Expected {} arguments, got {}", func_args.len(), args.len())
                 }
                 for (arg, value) in func_args.iter().zip(args) {
-                    new_scope.lock().unwrap().insert(arg.clone(), value, false);
+                    new_scope.lock().unwrap().insert(arg.clone(), value, false, loc);
                 }
                 self.run(body, &mut new_scope);
                 let value = if let ControlFlowDecision::Return(value) = &self.control_flow {
@@ -257,7 +257,7 @@ impl Interpreter {
                 self.control_flow = ControlFlowDecision::None;
                 value
             }
-            _ => error!("{loc}: Can't call object {:?}", func)
+            _ => error!(loc, "Can't call object {:?}", func)
         }
     }
 }

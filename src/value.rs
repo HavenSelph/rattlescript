@@ -25,7 +25,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left + right as f64),
             (Value::String(left), Value::String(right)) => Value::String(left + &right),
-            _ => error!("{loc}: Invalid types for addition")
+            _ => error!(loc, "Invalid types for addition")
         }
     }
 
@@ -35,7 +35,7 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left - right as f64),
-            _ => error!("{loc}: Invalid types for subtraction")
+            _ => error!(loc, "Invalid types for subtraction")
         }
     }
 
@@ -46,10 +46,10 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left * right as f64),
             (Value::String(left), Value::Integer(right)) => {
-                if right < 0 { error!("{loc}: {right} is not a positive integer.") }
+                if right < 0 { error!(loc, "{right} is not a positive integer.") }
                 Value::String(left.repeat(right as usize))
             },
-            _ => error!("{loc}: Invalid types for multiplication")
+            _ => error!(loc, "Invalid types for multiplication")
         }
     }
 
@@ -59,7 +59,7 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 / right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left / right as f64),
-            _ => error!("{loc}: Invalid types for division")
+            _ => error!(loc, "Invalid types for division")
         }
     }
 
@@ -71,7 +71,7 @@ impl Value {
                 let end = end.unwrap_or(Value::Integer(s.len() as i64));
                 match (start, end, step) {
                     (Value::Integer(start), Value::Integer(end), Value::Integer(step)) => {
-                        if step == 0 { error!("{loc}: Step cannot be 0") }
+                        if step == 0 { error!(loc, "Step cannot be 0") }
                         let mut result = String::new();
                         let mut i = start;
                         while i < end {
@@ -80,10 +80,10 @@ impl Value {
                         }
                         Value::String(result)
                     },
-                    _ => error!("{loc}: Invalid types for slice")
+                    _ => error!(loc, "Invalid types for slice")
                 }
             },
-            _ => error!("{loc}: Can only slice strings")
+            _ => error!(loc, "Can only slice strings")
         }
     }
 
@@ -91,19 +91,19 @@ impl Value {
     pub fn not(self, loc: &Location) -> Value {
         match self {
             Value::Boolean(b) => Value::Boolean(!b),
-            _ => error!("{loc}: Invalid type for not")
+            _ => error!(loc, "Invalid type for not")
         }
     }
     pub fn and(self, other: Value, loc: &Location) -> Value {
         match (self, other) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left && right),
-            _ => error!("{loc}: Invalid types for and")
+            _ => error!(loc, "Invalid types for and")
         }
     }
     pub fn or(self, other: Value, loc: &Location) -> Value {
         match (self, other) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left || right),
-            _ => error!("{loc}: Invalid types for or")
+            _ => error!(loc, "Invalid types for or")
         }
     }
 
@@ -131,7 +131,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left < right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left < right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left < right),
-            _ => error!("{loc}: Invalid types for less than")
+            _ => error!(loc, "Invalid types for less than")
         }
     }
 
@@ -145,7 +145,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left <= right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left <= right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left <= right),
-            _ => error!("{loc}: Invalid types for less than")
+            _ => error!(loc, "Invalid types for less than")
         }
     }
     pub fn greater_than_equals(self, other: Value, loc: &Location) -> Value {
