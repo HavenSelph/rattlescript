@@ -1,7 +1,7 @@
 use crate::ast::AST;
+use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Ref, Scope};
 use crate::token::Location;
-use crate::error::{runtime_error as error, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -222,9 +222,9 @@ impl Value {
             Value::Boolean(b) => b.to_string(),
             Value::Range(start, end) => format!("{}..{}", start, end),
             Value::Iterator(_) => "<iterator>".to_string(),
-            Value::Function{..} => "<function>".to_string(),
+            Value::Function { .. } => "<function>".to_string(),
             Value::BuiltInFunction(name) => format!("<built-in function {}>", name),
-            Value::Nothing => "nothing".to_string()
+            Value::Nothing => "nothing".to_string(),
         }
     }
 }

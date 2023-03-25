@@ -1,6 +1,6 @@
 use crate::ast::AST;
+use crate::error::{eof_error, parser_error as error, Result};
 use crate::token::{Token, TokenKind};
-use crate::error::{parser_error as error, eof_error, Result};
 use std::rc::Rc;
 
 pub struct Parser {
@@ -469,6 +469,7 @@ impl Parser {
                 } => {
                     self.increment();
                     let mut args = vec![];
+                    // TODO: refactor
                     loop {
                         match self.cur().kind {
                             TokenKind::RightParen => {
@@ -479,8 +480,11 @@ impl Parser {
                                 args.push(self.parse_expression()?);
                                 match self.cur().kind {
                                     TokenKind::Comma => self.increment(),
-                                    TokenKind::RightParen => {},
-                                    TokenKind::EOF => eof_error!(self.cur().loc,"Expected `)` or ',' but got EOF"),
+                                    TokenKind::RightParen => {}
+                                    TokenKind::EOF => eof_error!(
+                                        self.cur().loc,
+                                        "Expected `)` or ',' but got EOF"
+                                    ),
                                     _ => error!(
                                         self.cur().loc,
                                         "Expected `)` or `,` but got {:?}",

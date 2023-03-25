@@ -1,7 +1,7 @@
 use crate::ast::AST;
 use crate::builtin;
-use crate::token::Location;
 use crate::error::{runtime_error as error, Result};
+use crate::token::Location;
 use crate::value::{IteratorValue, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -54,10 +54,18 @@ pub struct Interpreter {
     control_flow: ControlFlow,
 }
 
+macro_rules! builtins {
+    ($($name:ident),+ $(,)?) => {
+        HashMap::from([$(
+            (stringify!($name), builtin::$name as BuiltInFunctionType),
+        )+])
+    };
+}
+
 impl Interpreter {
     pub fn new() -> Interpreter {
         let builtins =
-            HashMap::from([("print", builtin::print as _), ("len", builtin::len as _)]);
+            builtins!(print, len, exit);
 
         Interpreter {
             builtins,
