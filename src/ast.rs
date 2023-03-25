@@ -33,4 +33,7 @@ pub enum AST {
     GreaterThan(Location, Arc<AST>, Arc<AST>),
     LessThanEquals(Location, Arc<AST>, Arc<AST>),
     GreaterThanEquals(Location, Arc<AST>, Arc<AST>),
+    While(Location, Arc<AST>, Arc<AST>),
+    Continue(Location),
+    Break(Location),
 }

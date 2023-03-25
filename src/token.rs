@@ -57,6 +57,9 @@ pub enum TokenKind {
     Star,
     StringLiteral,
     True,
+    While,
+    Continue,
+    Break,
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +95,9 @@ impl Token {
                 "or" => TokenKind::Or,
                 "return" => TokenKind::Return,
                 "true" => TokenKind::True,
+                "while" => TokenKind::While,
+                "continue" => TokenKind::Continue,
+                "break" => TokenKind::Break,
                 _ => TokenKind::Identifier
             },
             loc,

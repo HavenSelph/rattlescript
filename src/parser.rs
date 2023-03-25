@@ -160,6 +160,22 @@ impl Parser {
                     ))
                 ))
             }
+            Token { kind: TokenKind::Continue, loc, ..} => {
+                self.increment();
+                self.consume_line_end();
+                Arc::new(AST::Continue(loc))
+            }
+            Token { kind: TokenKind::Break, loc, ..} => {
+                self.increment();
+                self.consume_line_end();
+                Arc::new(AST::Break(loc))
+            }
+            Token { kind: TokenKind::While, loc, ..} => {
+                self.increment();
+                let cond = self.parse_expression();
+                let body = self.parse_block(/*global*/ false);
+                Arc::new(AST::While(loc, cond, body))
+            }
             Token { kind: TokenKind::Return, loc, ..} => {
                 self.increment();
                 let expr = self.parse_expression();

@@ -47,6 +47,8 @@ pub type Ref<T> = Arc<Mutex<T>>;
 
 enum ControlFlowDecision {
     None,
+    Continue,
+    Break,
     Return(Value),
 }
 
@@ -68,28 +70,28 @@ impl Interpreter {
     }
 
     pub fn execute(&mut self, ast: &Arc<AST>) -> Value {
-        let mut scope = Arc::new(Mutex::new(Scope {
+        let scope = Arc::new(Mutex::new(Scope {
             vars: HashMap::new(),
             parent: None,
             in_function: false,
         }));
-        self.run(ast, &mut scope)
+        self.run(ast, scope.clone())
     }
 
-    fn run(&mut self, ast: &Arc<AST>, scope: &mut Ref<Scope>) -> Value {
+    fn run(&mut self, ast: &Arc<AST>, scope: Ref<Scope>) -> Value {
 
         macro_rules! dispatch_op {
             ($loc:expr, $op:path, $left:expr, $right:expr) => {
                 {
-                    let left = self.run($left, scope);
-                    let right = self.run($right, scope);
+                    let left = self.run($left, scope.clone());
+                    let right = self.run($right, scope.clone());
                     $op(left, right, $loc)
                 }
             };
 
             ($loc:expr, $op:path, $val:expr) => {
                 {
-                    let val = self.run($val, scope);
+                    let val = self.run($val, scope.clone());
                     $op(val, $loc)
                 }
             };
@@ -98,8 +100,13 @@ impl Interpreter {
         match ast.as_ref() {
             AST::Block(_, stmts) => {
                 let mut last = Value::Nothing;
+                let block_scope = Arc::new(Mutex::new(Scope {
+                    vars: HashMap::new(),
+                    parent: Some(scope.clone()),
+                    in_function: scope.lock().unwrap().in_function,
+                }));
                 for stmt in stmts {
-                    last = self.run(stmt, scope);
+                    last = self.run(stmt, block_scope.clone());
                     match self.control_flow {
                         ControlFlowDecision::None => {},
                         _ => break,
@@ -111,17 +118,39 @@ impl Interpreter {
                 self.handle_call(scope, loc, func, args)
             },
             AST::If(loc, cond, body, else_body) => {
-                let cond = self.run(cond, scope);
+                let cond = self.run(cond, scope.clone());
                 match cond {
-                    Value::Boolean(true) => self.run(body, scope),
+                    Value::Boolean(true) => self.run(body, scope.clone()),
                     Value::Boolean(false) => {
                         match else_body {
-                            Some(else_body) => self.run(else_body, scope),
+                            Some(else_body) => self.run(else_body, scope.clone()),
                             None => Value::Nothing,
                         }
                     },
                     _ => error!(loc, "If condition must be a boolean")
                 }
+            },
+            AST::While(loc, cond, body) => {
+                loop {
+                    let cond = self.run(cond, scope.clone());
+                    match cond {
+                        Value::Boolean(true) => {
+                            self.run(body, scope.clone());
+                            match self.control_flow {
+                                ControlFlowDecision::None => {},
+                                ControlFlowDecision::Continue => self.control_flow = ControlFlowDecision::None,
+                                ControlFlowDecision::Break => {
+                                    self.control_flow = ControlFlowDecision::None;
+                                    break;
+                                },
+                                ControlFlowDecision::Return(_) => break,
+                            }
+                        },
+                        Value::Boolean(false) => break,
+                        _ => error!(loc, "While condition must be a boolean")
+                    }
+                }
+                Value::Nothing
             },
             AST::BooleanLiteral(_, value) => Value::Boolean(*value),
             AST::IntegerLiteral(_, num) => Value::Integer(*num),
@@ -135,12 +164,12 @@ impl Interpreter {
                 if self.builtins.contains_key(name) {
                     error!(loc, "`{}` is a built-in function, can't be used as a variable", name)
                 }
-                let value = self.run(value, scope);
+                let value = self.run(value, scope.clone());
                 scope.lock().unwrap().insert(name.clone(), value.clone(), false, loc);
                 value
             },
             AST::Assignment(loc, lhs, value) => {
-                let value = self.run(value, scope);
+                let value = self.run(value, scope.clone());
                 match lhs.as_ref() {
                     AST::Variable(loc, name) => {
                         if let None = scope.lock().unwrap().get(name) {
@@ -156,8 +185,8 @@ impl Interpreter {
                 }
             },
             AST::Index(loc, left, right) => {
-                let left = self.run(left, scope);
-                let right = self.run(right, scope);
+                let left = self.run(left, scope.clone());
+                let right = self.run(right, scope.clone());
                 match (&left, &right) {
                     (Value::String(left), Value::Integer(right)) => {
                         match left.chars().nth(*right as usize) {
@@ -195,10 +224,10 @@ impl Interpreter {
             AST::GreaterThanEquals(loc, left, right) => dispatch_op!(loc, Value::greater_than_equals, left, right),
 
             AST::Slice {loc, lhs, start, end, step} => {
-                let lhs = self.run(lhs, scope);
-                let start = start.clone().map(|start| self.run(&start, scope));
-                let end = end.clone().map(|end| self.run(&end, scope));
-                let step = step.clone().map(|step| self.run(&step, scope));
+                let lhs = self.run(lhs, scope.clone());
+                let start = start.clone().map(|start| self.run(&start, scope.clone()));
+                let end = end.clone().map(|end| self.run(&end, scope.clone()));
+                let step = step.clone().map(|step| self.run(&step, scope.clone()));
                 lhs.slice(start, end, step, loc)
             }
             AST::Function { name, args, body, loc, .. } => {
@@ -208,9 +237,7 @@ impl Interpreter {
                     scope: scope.clone()
                 };
                 match name {
-                    Some(name) => {
-                        scope.lock().unwrap().insert(name.clone(), func.clone(), false, loc);
-                    },
+                    Some(name) => scope.lock().unwrap().insert(name.clone(), func.clone(), false, loc),
                     None => {}
                 }
                 func
@@ -222,7 +249,14 @@ impl Interpreter {
                 self.control_flow = ControlFlowDecision::Return(self.run(val, scope));
                 Value::Nothing
             },
-
+            AST::Break(_loc) => {
+                self.control_flow = ControlFlowDecision::Break;
+                Value::Nothing
+            },
+            AST::Continue(_loc) => {
+                self.control_flow = ControlFlowDecision::Continue;
+                Value::Nothing
+            },
             AST::Assert(loc, cond) => {
                 let cond = self.run(cond, scope);
                 match cond {
@@ -235,9 +269,9 @@ impl Interpreter {
         }
     }
 
-    fn handle_call(&mut self, scope: &mut Ref<Scope>, loc: &Location, func: &Arc<AST>, args: &Vec<Arc<AST>>) -> Value {
-        let func = self.run(func, scope);
-        let args: Vec<_> = args.iter().map(|arg| self.run(arg, scope)).collect();
+    fn handle_call(&mut self, scope: Ref<Scope>, loc: &Location, func: &Arc<AST>, args: &Vec<Arc<AST>>) -> Value {
+        let func = self.run(func, scope.clone());
+        let args: Vec<_> = args.iter().map(|arg| self.run(arg, scope.clone())).collect();
 
         match &func {
             Value::BuiltInFunction(func) => {
@@ -247,7 +281,7 @@ impl Interpreter {
                 }
             }
             Value::Function{ body, args: func_args, scope: closure_scope, .. } => {
-                let mut new_scope = Arc::new(Mutex::new(Scope {
+                let new_scope = Arc::new(Mutex::new(Scope {
                     vars: HashMap::new(),
                     parent: Some(closure_scope.clone()),
                     in_function: true,
@@ -258,7 +292,7 @@ impl Interpreter {
                 for (arg, value) in func_args.iter().zip(args) {
                     new_scope.lock().unwrap().insert(arg.clone(), value, false, loc);
                 }
-                self.run(body, &mut new_scope);
+                self.run(body, new_scope);
                 let value = if let ControlFlowDecision::Return(value) = &self.control_flow {
                     value.clone()
                 } else {
