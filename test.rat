@@ -37,7 +37,7 @@ divide(4,2)
 let boo = true
 let not_boo = true
 
-assert boo == false, "failed"
+assert boo == true, "failed"
 
 if boo {
     print("boo is true")

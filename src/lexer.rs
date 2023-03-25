@@ -1,5 +1,5 @@
 use crate::token::{Location, Token, TokenKind};
-use crate::utils::error;
+use crate::utils::{Error, Result};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -8,6 +8,13 @@ pub struct Lexer {
     current_index: usize,
     seen_newline: bool,
 }
+
+macro_rules! error {
+    ($loc:expr, $($arg:tt)*) => {
+        return Err(Error::LexerError($loc.clone(), format!($($arg)*)))
+    }
+}
+
 
 impl Lexer {
     pub fn new(input: String, filename: String) -> Lexer {
@@ -23,9 +30,12 @@ impl Lexer {
         }
     }
 
-    pub fn from_file(filename: String) -> Lexer {
-        let input = std::fs::read_to_string(filename.clone()).unwrap();
-        Lexer::new(input, filename)
+    pub fn from_file(filename: String) -> Result<Lexer> {
+        let input = match std::fs::read_to_string(filename.clone()) {
+            Ok(input) => input,
+            Err(e) => return Err(Error::SomethingElse(format!("Failed to read file: {}: {:?}", filename, e))),
+        };
+        Ok(Lexer::new(input, filename))
     }
 
     fn cur(&self) -> Option<char> {
@@ -69,7 +79,7 @@ impl Lexer {
         self.seen_newline = false;
     }
 
-    pub fn lex(&mut self) -> Vec<Token> {
+    pub fn lex(&mut self) -> Result<Vec<Token>> {
         let mut tokens: Vec<Token> = vec![];
         while let Some(c) = self.cur() {
             match c {
@@ -150,7 +160,7 @@ impl Lexer {
                 '}' => self.push_simple(&mut tokens, TokenKind::RightBrace, 1),
                 '@' => self.push_simple(&mut tokens, TokenKind::At, 1),
                 '"' => {
-                    let token = self.lex_string_literal();
+                    let token = self.lex_string_literal()?;
                     self.push(&mut tokens, token);
                 },
                 '.' => match self.peek(1) {
@@ -175,10 +185,10 @@ impl Lexer {
             }
         }
         self.push_simple(&mut tokens, TokenKind::EOF, 0);
-        return tokens;
+        return Ok(tokens);
     }
 
-    fn lex_string_literal(&mut self) -> Token {
+    fn lex_string_literal(&mut self) -> Result<Token> {
         let loc = self.location.clone();
         let mut string = String::new();
         self.increment();
@@ -197,6 +207,6 @@ impl Lexer {
                 }
             }
         }
-        Token::new(TokenKind::StringLiteral, loc, string)
+        Ok(Token::new(TokenKind::StringLiteral, loc, string))
     }
 }

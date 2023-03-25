@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use crate::token::Location;
 use crate::ast::AST;
 use crate::interpreter::{Scope, Ref};
-use crate::utils::error;
+use crate::utils::{Result, Error};
 
 use std::fmt::{Debug, Formatter};
 
@@ -14,6 +14,12 @@ pub struct IteratorValue(pub Rc<RefCell<dyn Iterator<Item=Value>>>);
 struct StringIterator {
     string: String,
     index: usize,
+}
+
+macro_rules! error {
+    ($loc:expr, $($arg:tt)*) => {
+        return Err(Error::RuntimeError($loc.clone(), format!($($arg)*)))
+    }
 }
 
 impl Iterator for StringIterator {
@@ -61,29 +67,29 @@ pub enum Value {
 
 
 impl Value {
-    pub fn plus(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn plus(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left + right),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 + right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left + right as f64),
             (Value::String(left), Value::String(right)) => Value::String(left + &right),
             _ => error!(loc, "Invalid types for addition")
-        }
+        })
     }
 
-    pub fn minus(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn minus(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left - right),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left - right as f64),
             _ => error!(loc, "Invalid types for subtraction")
-        }
+        })
     }
 
-    pub fn multiply(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn multiply(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left * right),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 * right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
@@ -93,20 +99,20 @@ impl Value {
                 Value::String(left.repeat(right as usize))
             },
             _ => error!(loc, "Invalid types for multiplication")
-        }
+        })
     }
 
-    pub fn divide(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn divide(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Integer(left / right),
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 / right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left / right as f64),
             _ => error!(loc, "Invalid types for division")
-        }
+        })
     }
 
-    pub fn slice(self, start: Option<Value>, end: Option<Value>, step: Option<Value>, loc: &Location) -> Value {
+    pub fn slice(self, start: Option<Value>, end: Option<Value>, step: Option<Value>, loc: &Location) -> Result<Value> {
         let start = start.unwrap_or(Value::Integer(0));
         let step = step.unwrap_or(Value::Integer(1));
         match self {
@@ -121,7 +127,7 @@ impl Value {
                             result.push(s.chars().nth(i as usize).unwrap());
                             i += step;
                         }
-                        Value::String(result)
+                        Ok(Value::String(result))
                     },
                     _ => error!(loc, "Invalid types for slice")
                 }
@@ -131,27 +137,27 @@ impl Value {
     }
 
 
-    pub fn not(self, loc: &Location) -> Value {
-        match self {
+    pub fn not(self, loc: &Location) -> Result<Value> {
+        Ok(match self {
             Value::Boolean(b) => Value::Boolean(!b),
             _ => error!(loc, "Invalid type for not")
-        }
+        })
     }
-    pub fn and(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn and(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left && right),
             _ => error!(loc, "Invalid types for and")
-        }
+        })
     }
-    pub fn or(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn or(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left || right),
             _ => error!(loc, "Invalid types for or")
-        }
+        })
     }
 
-    pub fn equals(self, other: Value, _loc: &Location) -> Value {
-        match (self, other) {
+    pub fn equals(self, other: Value, _loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left == right),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean(left as f64 == right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left == right),
@@ -159,39 +165,39 @@ impl Value {
             (Value::String(left), Value::String(right)) => Value::Boolean(left == right),
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left == right),
             _ => Value::Boolean(false)
-        }
+        })
     }
-    pub fn not_equals(self, other: Value, loc: &Location) -> Value {
-        match self.equals(other, loc) {
+    pub fn not_equals(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match self.equals(other, loc)? {
             Value::Boolean(b) => Value::Boolean(!b),
             _ => unreachable!("equals should always return a boolean")
-        }
+        })
     }
-    pub fn less_than(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn less_than(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left < right),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) < right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left < right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left < right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left < right),
             _ => error!(loc, "Invalid types for less than")
-        }
+        })
     }
 
-    pub fn greater_than(self, other: Value, loc: &Location) -> Value {
+    pub fn greater_than(self, other: Value, loc: &Location) -> Result<Value> {
         other.less_than(self, loc)
     }
-    pub fn less_than_equals(self, other: Value, loc: &Location) -> Value {
-        match (self, other) {
+    pub fn less_than_equals(self, other: Value, loc: &Location) -> Result<Value> {
+        Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => Value::Boolean(left <= right),
             (Value::Integer(left), Value::Float(right)) => Value::Boolean((left as f64) <= right),
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left <= right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left <= right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left <= right),
             _ => error!(loc, "Invalid types for less than")
-        }
+        })
     }
-    pub fn greater_than_equals(self, other: Value, loc: &Location) -> Value {
+    pub fn greater_than_equals(self, other: Value, loc: &Location) -> Result<Value> {
         other.less_than_equals(self, loc)
     }
 

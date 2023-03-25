@@ -1,4 +1,14 @@
+use crate::token::Location;
 
+#[derive(Debug)]
+pub enum Error {
+    LexerError(Location, String),
+    ParserError(Location, String),
+    RuntimeError(Location, String),
+    SomethingElse(String),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! error {
     ($loc:expr, $($arg:tt)*) => {
