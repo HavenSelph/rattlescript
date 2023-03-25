@@ -17,6 +17,7 @@ impl Display for Location {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     And,
+    Assert,
     At,
     Bang,
     BangEquals,
@@ -80,6 +81,7 @@ impl Token {
         Token {
             kind: match text.as_ref() {
                 "and" => TokenKind::And,
+                "assert" => TokenKind::Assert,
                 "def" => TokenKind::Def,
                 "else" => TokenKind::Else,
                 "false" => TokenKind::False,

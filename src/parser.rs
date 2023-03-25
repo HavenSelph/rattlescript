@@ -166,6 +166,19 @@ impl Parser {
                 self.consume_line_end();
                 Arc::new(AST::Return(loc, expr))
             }
+            Token { kind: TokenKind::Assert, loc, ..} => {
+                self.increment();
+                let cond = self.parse_expression();
+                if self.cur().kind == TokenKind::Comma {
+                    self.increment();
+                    if self.cur().kind != TokenKind::StringLiteral {
+                        error!(self.cur().loc, "Expected string literal, but got {:?}", self.cur().kind);
+                    }
+                    self.parse_expression();
+                }
+                self.consume_line_end();
+                Arc::new(AST::Assert(loc, cond))
+            }
             _ => {
                 let expr = self.parse_expression();
                 self.consume_line_end();

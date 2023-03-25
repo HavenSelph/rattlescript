@@ -5,6 +5,7 @@ use crate::token::Location;
 #[derive(Debug)]
 pub enum AST {
     And(Location, Arc<AST>, Arc<AST>),
+    Assert(Location, Arc<AST>),
     Assignment(Location, Arc<AST>, Arc<AST>),
     Block(Location, Vec<Arc<AST>>),
     BooleanLiteral(Location, bool),

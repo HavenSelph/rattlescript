@@ -222,6 +222,16 @@ impl Interpreter {
                 self.control_flow = ControlFlowDecision::Return(self.run(val, scope));
                 Value::Nothing
             },
+
+            AST::Assert(loc, cond) => {
+                let cond = self.run(cond, scope);
+                match cond {
+                    Value::Boolean(true) => {},
+                    Value::Boolean(false) => error!(loc, "Assertion failed"),
+                    _ => error!(loc, "Assertion condition must be a boolean")
+                }
+                Value::Nothing
+            },
         }
     }
 
