@@ -75,15 +75,7 @@ impl Lexer {
                 '0'..='9' => {
                     let loc = self.location.clone();
                     let mut num = String::new();
-                    while let Some(c) = self.cur() {
-                        match c {
-                            '0'..='9' => {
-                                num.push(c);
-                                self.increment();
-                            }
-                            _ => break,
-                        }
-                    }
+                    self.lex_num(&mut num);
                     if let Some('.') = self.cur() {
                         if let Some('.') = self.peek(1) {
                             self.push(
@@ -93,15 +85,7 @@ impl Lexer {
                         } else {
                             num.push('.');
                             self.increment();
-                            while let Some(c) = self.cur() {
-                                match c {
-                                    '0'..='9' => {
-                                        num.push(c);
-                                        self.increment();
-                                    }
-                                    _ => break,
-                                }
-                            }
+                            self.lex_num(&mut num);
                             self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
                         }
                     } else {
@@ -199,5 +183,18 @@ impl Lexer {
             }
         }
         Ok(Token::new(TokenKind::StringLiteral, loc, string))
+    }
+
+    fn lex_num(&mut self, num: &mut String) {
+        while let Some(c) = self.cur() {
+            match c {
+                '0'..='9' => {
+                    num.push(c);
+                    self.increment();
+                }
+                '_' => self.increment(),
+                _ => break,
+            }
+        }
     }
 }
