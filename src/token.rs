@@ -25,7 +25,7 @@ pub enum TokenKind {
     Def,
     Dot,
     DotDot,
-    Eof,
+    EOF,
     Else,
     Equals,
     EqualsEquals,

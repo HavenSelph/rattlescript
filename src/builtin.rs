@@ -1,5 +1,5 @@
 use crate::token::Location;
-use crate::utils::{runtime_error as error, Result};
+use crate::error::{runtime_error as error, Result};
 use crate::value::Value;
 
 pub fn print(_loc: &Location, args: Vec<Value>) -> Result<Value> {

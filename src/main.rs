@@ -1,14 +1,47 @@
-use crate::utils::Result;
+use crate::error::Result;
 use std::process::exit;
 
 mod ast;
-mod builtins;
+mod builtin;
+mod error;
 mod interpreter;
 mod lexer;
 mod parser;
+mod repl;
 mod token;
-mod utils;
 mod value;
+
+
+fn main() -> Result<()> {
+    let args = Args::get_args();
+    if args.repl && args.file.is_some() {
+        println!("Cannot run file and repl at the same time.");
+        exit(1);
+    } else if args.file.is_some() && args.code.is_some() {
+        println!("Cannot run file and pass --code or -c at the same time.");
+        exit(1);
+    }
+    if args.repl {
+        let mut repl = repl::Repl::new();
+        repl.run();
+        exit(0)
+    }
+    let file = if let Some(ref file) = args.file {
+        std::fs::read_to_string(file).expect("Couldn't open input file")
+    } else if let Some(code) = args.code {
+        code
+    } else {
+        unreachable!()
+    };
+    let mut lex = lexer::Lexer::new(file,args.file.unwrap_or(String::from("<input>")));
+    let tokens = lex.lex()?;
+    let mut parser = parser::Parser::new(tokens);
+    let ast = parser.parse()?;
+    let mut interpreter = interpreter::Interpreter::new();
+    interpreter.execute(&ast)?;
+    Ok(())
+}
+
 
 #[derive(Debug)]
 struct Args {
@@ -82,30 +115,4 @@ impl Args {
             }
         }
     }
-}
-
-fn main() -> Result<()> {
-    let args = Args::get_args();
-    if args.repl && args.file.is_none() {
-        unimplemented!("Repl is not implemented yet.")
-    } else if args.file.is_some() && !args.repl && args.code.is_none() {
-        let mut lex = lexer::Lexer::from_file(args.file.unwrap())?;
-        let tokens = lex.lex()?;
-        let mut parser = parser::Parser::new(tokens);
-        let ast = parser.parse()?;
-        let mut interpreter = interpreter::Interpreter::new();
-        interpreter.execute(&ast)?;
-    } else if args.code.is_some() && args.file.is_none() {
-        let mut lex = lexer::Lexer::new(args.code.unwrap(), String::from("<string>"));
-        let tokens = lex.lex()?;
-        let mut parser = parser::Parser::new(tokens);
-        let ast = parser.parse()?;
-        let mut interpreter = interpreter::Interpreter::new();
-        interpreter.execute(&ast)?;
-    } else {
-        println!("Bad arguments passed");
-        println!("Usage: rattlesnake [file] [args]");
-        exit(1);
-    }
-    Ok(())
 }
