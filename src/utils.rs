@@ -2,15 +2,38 @@ use crate::token::Location;
 
 #[derive(Debug)]
 pub enum Error {
-    LexerError(Location, String),
-    ParserError(Location, String),
-    RuntimeError(Location, String),
-    SomethingElse(String),
+    Lexer(Location, String),
+    Parser(Location, String),
+    Runtime(Location, String),
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-macro_rules! error {
+macro_rules! lexer_error {
+    ($loc:expr, $($arg:tt)*) => {
+        return Err(crate::utils::Error::Lexer($loc.clone(), format!($($arg)*)))
+    }
+}
+pub(crate) use lexer_error;
+
+macro_rules! parser_error {
+    ($loc:expr, $($arg:tt)*) => {
+        return Err(crate::utils::Error::Parser($loc.clone(), format!($($arg)*)))
+    }
+}
+pub(crate) use parser_error;
+
+macro_rules! runtime_error {
+    ($loc:expr, $($arg:tt)*) => {
+        return Err(crate::utils::Error::Runtime($loc.clone(), format!($($arg)*)))
+    }
+}
+pub(crate) use runtime_error;
+
+// TODO: refactor/remove
+/*
+macro_rules! _error {
     ($loc:expr, $($arg:tt)*) => {
         {
             let msg = format!($($arg)*);
@@ -42,5 +65,4 @@ macro_rules! error {
         }
     }
 }
-
-pub(crate) use error;
+*/

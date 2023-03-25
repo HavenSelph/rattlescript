@@ -1,8 +1,8 @@
-use crate::value::Value;
 use crate::token::Location;
-use crate::utils::error;
+use crate::utils::{runtime_error as error, Result};
+use crate::value::Value;
 
-pub fn print(_loc: &Location, args: Vec<Value>) -> Value {
+pub fn print(_loc: &Location, args: Vec<Value>) -> Result<Value> {
     for (i, arg) in args.iter().enumerate() {
         if i != 0 {
             print!(" ");
@@ -15,20 +15,20 @@ pub fn print(_loc: &Location, args: Vec<Value>) -> Value {
             Value::Nothing => print!("nothing"),
             Value::Iterator(_) => print!("<iterator>"),
             Value::Range(start, end) => print!("{}..{}", start, end),
-            _ => print!("{:?}", arg)
+            _ => print!("{:?}", arg),
         }
     }
     println!();
-    Value::Nothing
+    Ok(Value::Nothing)
 }
 
-pub fn len(loc: &Location, args: Vec<Value>) -> Value {
+pub fn len(loc: &Location, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(loc, "len() takes exactly one argument");
     }
 
-    match &args[0] {
+    Ok(match &args[0] {
         Value::String(string) => Value::Integer(string.len() as i64),
         other => error!(loc, "len() does not support {:?}", other),
-    }
+    })
 }

@@ -1,15 +1,14 @@
-use std::process::exit;
 use crate::utils::Result;
+use std::process::exit;
 
+mod ast;
+mod builtins;
+mod interpreter;
 mod lexer;
 mod parser;
-mod ast;
-mod utils;
 mod token;
-mod interpreter;
-mod builtins;
+mod utils;
 mod value;
-
 
 #[derive(Debug)]
 struct Args {
@@ -17,7 +16,6 @@ struct Args {
     file: Option<String>,
     code: Option<String>,
 }
-
 
 impl Args {
     fn get_args() -> Args {
@@ -41,7 +39,7 @@ impl Args {
                             println!("Bad usage of repl param.");
                             println!("Usage: rattlesnake [file] [args]");
                             exit(1);
-                        },
+                        }
                         None => Some(true),
                     };
                 } else if item == "--file" || item == "-f" {
@@ -50,11 +48,11 @@ impl Args {
                             println!("Multiple usages of file param.");
                             println!("Usage: rattlesnake [file] [args]");
                             exit(1);
-                        },
+                        }
                         None => {
                             i += 1;
                             Some(args[i].clone())
-                        },
+                        }
                     };
                 } else if item == "--code" || item == "-c" {
                     code = match code {
@@ -62,11 +60,11 @@ impl Args {
                             println!("Multiple usages of code param.");
                             println!("Usage: rattlesnake [file] [args]");
                             exit(1);
-                        },
+                        }
                         None => {
                             i += 1;
                             Some(args[i].clone())
-                        },
+                        }
                     };
                 } else if !(item.starts_with('-') || item.starts_with("--")) && i == 1 {
                     file = Some(item.clone());
@@ -80,7 +78,7 @@ impl Args {
             Args {
                 repl: repl.unwrap_or(false),
                 file,
-                code
+                code,
             }
         }
     }
@@ -88,16 +86,16 @@ impl Args {
 
 fn main() -> Result<()> {
     let args = Args::get_args();
-    if args.repl && !args.file.is_some() {
+    if args.repl && args.file.is_none() {
         unimplemented!("Repl is not implemented yet.")
-    } else if args.file.is_some() && !args.repl && !args.code.is_some() {
+    } else if args.file.is_some() && !args.repl && args.code.is_none() {
         let mut lex = lexer::Lexer::from_file(args.file.unwrap())?;
         let tokens = lex.lex()?;
         let mut parser = parser::Parser::new(tokens);
         let ast = parser.parse()?;
         let mut interpreter = interpreter::Interpreter::new();
         interpreter.execute(&ast)?;
-    } else if args.code.is_some() && !args.file.is_some() {
+    } else if args.code.is_some() && args.file.is_none() {
         let mut lex = lexer::Lexer::new(args.code.unwrap(), String::from("<string>"));
         let tokens = lex.lex()?;
         let mut parser = parser::Parser::new(tokens);

@@ -1,25 +1,18 @@
-use std::sync::Arc;
-use std::rc::Rc;
-use std::cell::RefCell;
+use crate::ast::Ast;
+use crate::interpreter::{Ref, Scope};
 use crate::token::Location;
-use crate::ast::AST;
-use crate::interpreter::{Scope, Ref};
-use crate::utils::{Result, Error};
+use crate::utils::{runtime_error as error, Result};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
-pub struct IteratorValue(pub Rc<RefCell<dyn Iterator<Item=Value>>>);
+pub struct IteratorValue(pub Rc<RefCell<dyn Iterator<Item = Value>>>);
 
 struct StringIterator {
     string: String,
     index: usize,
-}
-
-macro_rules! error {
-    ($loc:expr, $($arg:tt)*) => {
-        return Err(Error::RuntimeError($loc.clone(), format!($($arg)*)))
-    }
 }
 
 impl Iterator for StringIterator {
@@ -38,11 +31,11 @@ impl Iterator for StringIterator {
 
 impl IteratorValue {
     pub fn for_string(string: String) -> IteratorValue {
-        IteratorValue(Rc::new(RefCell::new(StringIterator {string, index: 0})))
+        IteratorValue(Rc::new(RefCell::new(StringIterator { string, index: 0 })))
     }
 
     pub fn for_range(start: i64, end: i64) -> IteratorValue {
-        IteratorValue(Rc::new(RefCell::new((start..end).map(|x| Value::Integer(x)))))
+        IteratorValue(Rc::new(RefCell::new((start..end).map(Value::Integer))))
     }
 }
 
@@ -61,10 +54,13 @@ pub enum Value {
     BuiltInFunction(String),
     Iterator(IteratorValue),
     Range(i64, i64),
-    Function{body: Arc<AST>, args: Vec<String>, scope: Ref<Scope>},
+    Function {
+        body: Rc<Ast>,
+        args: Vec<String>,
+        scope: Ref<Scope>,
+    },
     Nothing,
 }
-
 
 impl Value {
     pub fn plus(self, other: Value, loc: &Location) -> Result<Value> {
@@ -74,7 +70,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Float(left + right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left + right as f64),
             (Value::String(left), Value::String(right)) => Value::String(left + &right),
-            _ => error!(loc, "Invalid types for addition")
+            _ => error!(loc, "Invalid types for addition"),
         })
     }
 
@@ -84,7 +80,7 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 - right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left - right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left - right as f64),
-            _ => error!(loc, "Invalid types for subtraction")
+            _ => error!(loc, "Invalid types for subtraction"),
         })
     }
 
@@ -95,10 +91,12 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Float(left * right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left * right as f64),
             (Value::String(left), Value::Integer(right)) => {
-                if right < 0 { error!(loc, "{right} is not a positive integer.") }
+                if right < 0 {
+                    error!(loc, "{right} is not a positive integer.")
+                }
                 Value::String(left.repeat(right as usize))
-            },
-            _ => error!(loc, "Invalid types for multiplication")
+            }
+            _ => error!(loc, "Invalid types for multiplication"),
         })
     }
 
@@ -108,11 +106,17 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(left as f64 / right),
             (Value::Float(left), Value::Float(right)) => Value::Float(left / right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(left / right as f64),
-            _ => error!(loc, "Invalid types for division")
+            _ => error!(loc, "Invalid types for division"),
         })
     }
 
-    pub fn slice(self, start: Option<Value>, end: Option<Value>, step: Option<Value>, loc: &Location) -> Result<Value> {
+    pub fn slice(
+        self,
+        start: Option<Value>,
+        end: Option<Value>,
+        step: Option<Value>,
+        loc: &Location,
+    ) -> Result<Value> {
         let start = start.unwrap_or(Value::Integer(0));
         let step = step.unwrap_or(Value::Integer(1));
         match self {
@@ -120,7 +124,9 @@ impl Value {
                 let end = end.unwrap_or(Value::Integer(s.len() as i64));
                 match (start, end, step) {
                     (Value::Integer(start), Value::Integer(end), Value::Integer(step)) => {
-                        if step == 0 { error!(loc, "Step cannot be 0") }
+                        if step == 0 {
+                            error!(loc, "Step cannot be 0")
+                        }
                         let mut result = String::new();
                         let mut i = start;
                         while i < end {
@@ -128,31 +134,30 @@ impl Value {
                             i += step;
                         }
                         Ok(Value::String(result))
-                    },
-                    _ => error!(loc, "Invalid types for slice")
+                    }
+                    _ => error!(loc, "Invalid types for slice"),
                 }
-            },
-            _ => error!(loc, "Can only slice strings")
+            }
+            _ => error!(loc, "Can only slice strings"),
         }
     }
-
 
     pub fn not(self, loc: &Location) -> Result<Value> {
         Ok(match self {
             Value::Boolean(b) => Value::Boolean(!b),
-            _ => error!(loc, "Invalid type for not")
+            _ => error!(loc, "Invalid type for not"),
         })
     }
     pub fn and(self, other: Value, loc: &Location) -> Result<Value> {
         Ok(match (self, other) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left && right),
-            _ => error!(loc, "Invalid types for and")
+            _ => error!(loc, "Invalid types for and"),
         })
     }
     pub fn or(self, other: Value, loc: &Location) -> Result<Value> {
         Ok(match (self, other) {
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left || right),
-            _ => error!(loc, "Invalid types for or")
+            _ => error!(loc, "Invalid types for or"),
         })
     }
 
@@ -164,13 +169,13 @@ impl Value {
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left == right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left == right),
             (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(left == right),
-            _ => Value::Boolean(false)
+            _ => Value::Boolean(false),
         })
     }
     pub fn not_equals(self, other: Value, loc: &Location) -> Result<Value> {
         Ok(match self.equals(other, loc)? {
             Value::Boolean(b) => Value::Boolean(!b),
-            _ => unreachable!("equals should always return a boolean")
+            _ => unreachable!("equals should always return a boolean"),
         })
     }
     pub fn less_than(self, other: Value, loc: &Location) -> Result<Value> {
@@ -180,7 +185,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left < right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left < right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left < right),
-            _ => error!(loc, "Invalid types for less than")
+            _ => error!(loc, "Invalid types for less than"),
         })
     }
 
@@ -194,7 +199,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(left <= right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(left <= right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(left <= right),
-            _ => error!(loc, "Invalid types for less than")
+            _ => error!(loc, "Invalid types for less than"),
         })
     }
     pub fn greater_than_equals(self, other: Value, loc: &Location) -> Result<Value> {
@@ -205,7 +210,7 @@ impl Value {
         match self {
             Value::String(s) => Value::Iterator(IteratorValue::for_string(s)),
             Value::Range(start, end) => Value::Iterator(IteratorValue::for_range(start, end)),
-            _ => self
+            _ => self,
         }
     }
 }

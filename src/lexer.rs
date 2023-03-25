@@ -1,5 +1,5 @@
 use crate::token::{Location, Token, TokenKind};
-use crate::utils::{Error, Result};
+use crate::utils::{lexer_error as error, Error, Result};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -8,13 +8,6 @@ pub struct Lexer {
     current_index: usize,
     seen_newline: bool,
 }
-
-macro_rules! error {
-    ($loc:expr, $($arg:tt)*) => {
-        return Err(Error::LexerError($loc.clone(), format!($($arg)*)))
-    }
-}
-
 
 impl Lexer {
     pub fn new(input: String, filename: String) -> Lexer {
@@ -33,7 +26,12 @@ impl Lexer {
     pub fn from_file(filename: String) -> Result<Lexer> {
         let input = match std::fs::read_to_string(filename.clone()) {
             Ok(input) => input,
-            Err(e) => return Err(Error::SomethingElse(format!("Failed to read file: {}: {:?}", filename, e))),
+            Err(e) => {
+                return Err(Error::Other(format!(
+                    "Failed to read file: {}: {:?}",
+                    filename, e
+                )))
+            }
         };
         Ok(Lexer::new(input, filename))
     }
@@ -63,11 +61,14 @@ impl Lexer {
     }
 
     fn push_simple(&mut self, tokens: &mut Vec<Token>, kind: TokenKind, len: usize) {
-        self.push(tokens, Token::new(
-            kind, 
-            self.location.clone(),
-            self.input[self.current_index..self.current_index + len].to_string()
-        ));
+        self.push(
+            tokens,
+            Token::new(
+                kind,
+                self.location.clone(),
+                self.input[self.current_index..self.current_index + len].to_string(),
+            ),
+        );
         for _ in 0..len {
             self.increment();
         }
@@ -93,12 +94,15 @@ impl Lexer {
                                 num.push(c);
                                 self.increment();
                             }
-                            _ => break
+                            _ => break,
                         }
                     }
                     if let Some('.') = self.cur() {
                         if let Some('.') = self.peek(1) {
-                            self.push(&mut tokens, Token::new(TokenKind::IntegerLiteral, loc.clone(), num));
+                            self.push(
+                                &mut tokens,
+                                Token::new(TokenKind::IntegerLiteral, loc.clone(), num),
+                            );
                         } else {
                             num.push('.');
                             self.increment();
@@ -108,7 +112,7 @@ impl Lexer {
                                         num.push(c);
                                         self.increment();
                                     }
-                                    _ => break
+                                    _ => break,
                                 }
                             }
                             self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
@@ -128,9 +132,9 @@ impl Lexer {
                                 break;
                             }
                         }
-                    },
+                    }
                     _ => self.push_simple(&mut tokens, TokenKind::Slash, 1),
-                }
+                },
                 '(' => self.push_simple(&mut tokens, TokenKind::LeftParen, 1),
                 ')' => self.push_simple(&mut tokens, TokenKind::RightParen, 1),
                 '[' => self.push_simple(&mut tokens, TokenKind::LeftBracket, 1),
@@ -141,19 +145,19 @@ impl Lexer {
                     Some('>') => self.push_simple(&mut tokens, TokenKind::FatArrow, 2),
                     Some('=') => self.push_simple(&mut tokens, TokenKind::EqualsEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Equals, 1),
-                }
+                },
                 '<' => match self.peek(1) {
                     Some('=') => self.push_simple(&mut tokens, TokenKind::LessThanEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::LessThan, 1),
-                }
+                },
                 '>' => match self.peek(1) {
                     Some('=') => self.push_simple(&mut tokens, TokenKind::GreaterThanEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::GreaterThan, 1),
-                }
+                },
                 '!' => match self.peek(1) {
                     Some('=') => self.push_simple(&mut tokens, TokenKind::BangEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Bang, 1),
-                }
+                },
                 ';' => self.push_simple(&mut tokens, TokenKind::SemiColon, 1),
                 ',' => self.push_simple(&mut tokens, TokenKind::Comma, 1),
                 '{' => self.push_simple(&mut tokens, TokenKind::LeftBrace, 1),
@@ -162,7 +166,7 @@ impl Lexer {
                 '"' => {
                     let token = self.lex_string_literal()?;
                     self.push(&mut tokens, token);
-                },
+                }
                 '.' => match self.peek(1) {
                     Some('.') => self.push_simple(&mut tokens, TokenKind::DotDot, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Dot, 1),
@@ -176,7 +180,7 @@ impl Lexer {
                                 ident.push(c);
                                 self.increment();
                             }
-                            _ => break
+                            _ => break,
                         }
                     }
                     self.push(&mut tokens, Token::from_str(ident, loc));
@@ -184,8 +188,8 @@ impl Lexer {
                 _ => error!(self.location, "Unexpected character {}", c),
             }
         }
-        self.push_simple(&mut tokens, TokenKind::EOF, 0);
-        return Ok(tokens);
+        self.push_simple(&mut tokens, TokenKind::Eof, 0);
+        Ok(tokens)
     }
 
     fn lex_string_literal(&mut self) -> Result<Token> {
