@@ -87,18 +87,22 @@ impl Lexer {
                         }
                     }
                     if let Some('.') = self.cur() {
-                        num.push('.');
-                        self.increment();
-                        while let Some(c) = self.cur() {
-                            match c {
-                                '0'..='9' => {
-                                    num.push(c);
-                                    self.increment();
+                        if let Some('.') = self.peek(1) {
+                            self.push(&mut tokens, Token::new(TokenKind::IntegerLiteral, loc.clone(), num));
+                        } else {
+                            num.push('.');
+                            self.increment();
+                            while let Some(c) = self.cur() {
+                                match c {
+                                    '0'..='9' => {
+                                        num.push(c);
+                                        self.increment();
+                                    }
+                                    _ => break
                                 }
-                                _ => break
                             }
+                            self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
                         }
-                        self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
                     } else {
                         self.push(&mut tokens, Token::new(TokenKind::IntegerLiteral, loc, num));
                     }
@@ -148,6 +152,10 @@ impl Lexer {
                 '"' => {
                     let token = self.lex_string_literal();
                     self.push(&mut tokens, token);
+                },
+                '.' => match self.peek(1) {
+                    Some('.') => self.push_simple(&mut tokens, TokenKind::DotDot, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::Dot, 1),
                 },
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let loc = self.location.clone();

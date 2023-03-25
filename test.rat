@@ -74,6 +74,11 @@ while n < 10 {
 }
 
 
+print("-"*80)
 for x in "hello" {
+    print(x)
+}
+print("-"*80)
+for x in 0..5 {
     print(x)
 }

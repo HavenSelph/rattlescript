@@ -13,6 +13,8 @@ pub fn print(_loc: &Location, args: Vec<Value>) -> Value {
             Value::String(string) => print!("{}", string),
             Value::Boolean(boolean) => print!("{}", boolean),
             Value::Nothing => print!("nothing"),
+            Value::Iterator(_) => print!("<iterator>"),
+            Value::Range(start, end) => print!("{}..{}", start, end),
             _ => print!("{:?}", arg)
         }
     }

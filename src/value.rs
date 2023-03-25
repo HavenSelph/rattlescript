@@ -34,6 +34,10 @@ impl IteratorValue {
     pub fn for_string(string: String) -> IteratorValue {
         IteratorValue(Rc::new(RefCell::new(StringIterator {string, index: 0})))
     }
+
+    pub fn for_range(start: i64, end: i64) -> IteratorValue {
+        IteratorValue(Rc::new(RefCell::new((start..end).map(|x| Value::Integer(x)))))
+    }
 }
 
 impl Debug for IteratorValue {
@@ -50,6 +54,7 @@ pub enum Value {
     Boolean(bool),
     BuiltInFunction(String),
     Iterator(IteratorValue),
+    Range(i64, i64),
     Function{body: Arc<AST>, args: Vec<String>, scope: Ref<Scope>},
     Nothing,
 }
@@ -193,6 +198,7 @@ impl Value {
     pub fn iterator(self, _loc: &Location) -> Value {
         match self {
             Value::String(s) => Value::Iterator(IteratorValue::for_string(s)),
+            Value::Range(start, end) => Value::Iterator(IteratorValue::for_range(start, end)),
             _ => self
         }
     }

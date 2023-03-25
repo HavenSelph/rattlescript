@@ -397,6 +397,11 @@ impl Parser {
                     }
                     val = Arc::new(AST::Call(loc, val, args));
                 }
+                Token { kind: TokenKind::DotDot, loc, .. } => {
+                    self.increment();
+                    let end = self.parse_atom();
+                    val = Arc::new(AST::Range(loc, val, end));
+                }
                 _ => break,
             }
         }

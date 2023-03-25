@@ -52,15 +52,16 @@ enum ControlFlowDecision {
 }
 
 pub struct Interpreter {
-    builtins: HashMap<String, BuiltInFunctionType>,
+    builtins: HashMap<&'static str, BuiltInFunctionType>,
     control_flow: ControlFlowDecision,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let mut builtins = HashMap::new();
-        builtins.insert("print".to_string(), builtins::print as BuiltInFunctionType);
-        builtins.insert("len".to_string(), builtins::len as BuiltInFunctionType);
+        let builtins = HashMap::from([
+            ("print", builtins::print as _),
+            ("len", builtins::len as _),
+        ]);
 
         Interpreter {
             builtins,
@@ -188,7 +189,7 @@ impl Interpreter {
                 if scope.lock().unwrap().vars.contains_key(name) {
                     error!(loc, "Variable {} already exists in scope", name)
                 }
-                if self.builtins.contains_key(name) {
+                if self.builtins.contains_key(name.as_str()) {
                     error!(loc, "`{}` is a built-in function, can't be used as a variable", name)
                 }
                 let value = self.run(value, scope.clone());
@@ -202,7 +203,7 @@ impl Interpreter {
                         if let None = scope.lock().unwrap().get(name) {
                             error!(loc, "Variable {} doesn't exist", name)
                         }
-                        if self.builtins.contains_key(name) {
+                        if self.builtins.contains_key(name.as_str()) {
                             error!(loc, "`{}` is a built-in function, can't override it", name)
                         }
                         scope.lock().unwrap().insert(name.clone(), value.clone(), true, loc);
@@ -225,7 +226,7 @@ impl Interpreter {
                 }
             },
             AST::Variable(loc, name) => {
-                if let Some(_) = self.builtins.get(name) {
+                if let Some(_) = self.builtins.get(name.as_str()) {
                     return Value::BuiltInFunction(name.clone())
                 }
                 if let Some(value) = scope.lock().unwrap().get(name) {
@@ -293,6 +294,16 @@ impl Interpreter {
                 }
                 Value::Nothing
             },
+            AST::Range(loc, start, end) => {
+                let start = self.run(start, scope.clone());
+                let end = self.run(end, scope.clone());
+                match (start, end) {
+                    (Value::Integer(start), Value::Integer(end)) => {
+                        Value::Range(start, end)
+                    },
+                    _ => error!(loc, "Range must be between integers")
+                }
+            },
         }
     }
 
@@ -302,7 +313,7 @@ impl Interpreter {
 
         match &func {
             Value::BuiltInFunction(func) => {
-                match self.builtins.get(func) {
+                match self.builtins.get(func.as_str()) {
                     Some(func) => func(loc, args),
                     None => unreachable!("{loc}: Built-in function {:?} not found", func)
                 }

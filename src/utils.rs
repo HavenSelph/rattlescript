@@ -24,7 +24,7 @@ macro_rules! error {
                 let line = lines[line_no];
                 println!("│{:>3} │ {}", line_no, line);
                 if line_no == $loc.line - 1 {
-                    println!("│    ├─{}┘ \x1b[0;31m{}\x1b[0m", String::from("─").repeat($loc.column - 1), msg);
+                    println!("│    ├─{}┘ \x1b[0;31m{}\x1b[0m", "─".repeat($loc.column - 1), msg);
                 }
             }
 

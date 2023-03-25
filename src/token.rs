@@ -24,6 +24,8 @@ pub enum TokenKind {
     Colon,
     Comma,
     Def,
+    Dot,
+    DotDot,
     EOF,
     Else,
     Equals,
