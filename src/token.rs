@@ -36,7 +36,10 @@ pub enum TokenKind {
     Identifier,
     If,
     In,
-    IntegerLiteral,
+    IntegerLiteralBin,
+    IntegerLiteralOct,
+    IntegerLiteralDec,
+    IntegerLiteralHex,
     LeftBrace,
     LeftBracket,
     LeftParen,
@@ -114,12 +117,10 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
-        match self.kind {
-            TokenKind::IntegerLiteral => write!(f, "IntegerLiteral({})", self.text),
-            TokenKind::FloatLiteral => write!(f, "FloatLiteral({})", self.text),
-            TokenKind::StringLiteral => write!(f, "StringLiteral({})", self.text),
-            TokenKind::Identifier => write!(f, "Identifier({})", self.text),
-            _ => write!(f, "{:?}", self.kind),
+        write!(f, "{:?}", self.kind)?;
+        if !self.text.is_empty() {
+            write!(f, "({})", self.text)?;
         }
+        Ok(())
     }
 }

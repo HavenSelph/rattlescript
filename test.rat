@@ -86,3 +86,5 @@ for x in 0..5 {
 
 let c = 100_000.25_18
 print(c)
+
+print(0b_101, 0o_67, 0x_22B, 0x_15b3)
