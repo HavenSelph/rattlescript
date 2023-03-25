@@ -22,17 +22,20 @@ fn main() -> Result<()> {
     }
     if args.repl {
         unimplemented!()
-    } else if args.file.is_some() {
-        let file = std::fs::read_to_string(args.file.clone().unwrap()).unwrap();
-        let mut lex = lexer::Lexer::new(file,args.file.unwrap());
-        let tokens = lex.lex()?;
-        let mut parser = parser::Parser::new(tokens);
-        let ast = parser.parse()?;
-        let mut interpreter = interpreter::Interpreter::new();
-        interpreter.execute(&ast)?;
-    } else if args.code.is_some() {
-        unimplemented!()
     }
+    let file = if let Some(ref file) = args.file {
+        std::fs::read_to_string(file).expect("Couldn't open input file")
+    } else if let Some(code) = args.code {
+        code
+    } else {
+        unreachable!()
+    };
+    let mut lex = lexer::Lexer::new(file,args.file.unwrap_or(String::from("<input>")));
+    let tokens = lex.lex()?;
+    let mut parser = parser::Parser::new(tokens);
+    let ast = parser.parse()?;
+    let mut interpreter = interpreter::Interpreter::new();
+    interpreter.execute(&ast)?;
     Ok(())
 }
 
