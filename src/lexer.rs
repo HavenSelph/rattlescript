@@ -105,7 +105,17 @@ impl Lexer {
                 '+' => self.push_simple(&mut tokens, TokenKind::Plus, 1),
                 '-' => self.push_simple(&mut tokens, TokenKind::Minus, 1),
                 '*' => self.push_simple(&mut tokens, TokenKind::Star, 1),
-                '/' => self.push_simple(&mut tokens, TokenKind::Slash, 1),
+                '/' => match self.peek(1) {
+                    Some('/') => {
+                        while let Some(c) = self.cur() {
+                            self.increment();
+                            if c == '\n' {
+                                break;
+                            }
+                        }
+                    },
+                    _ => self.push_simple(&mut tokens, TokenKind::Slash, 1),
+                }
                 '(' => self.push_simple(&mut tokens, TokenKind::LeftParen, 1),
                 ')' => self.push_simple(&mut tokens, TokenKind::RightParen, 1),
                 '[' => self.push_simple(&mut tokens, TokenKind::LeftBracket, 1),

@@ -33,3 +33,41 @@ let multiply = |a, b| { return a / b; }
 
 let divide = deco("division")(|a, b| => a / b)
 divide(4,2)
+
+let boo = false
+let not_boo = true
+
+if boo {
+    print("boo is true")
+} else if not_boo {
+    print("boo is false, but not_boo is true")
+} else {
+    print("boo is false, and not_boo is false")
+}
+
+let boo_lam = || => true
+
+if boo_lam() {
+    print("boo_lam is true")
+} else {
+    print("boo_lam is false")
+}
+
+print(true or false, false or true, false and true, true and true)
+print(not true)
+
+print(nothing)
+
+//if boo == foo {
+//    print("boo == foo")
+//} else {
+//    print("boo != foo")
+//}
+//
+//if 1 < 2 {
+//    print("1 < 2")
+//}
+//
+//if 2 >= 1 {
+//    print("2 >= 1")
+//}

@@ -41,16 +41,6 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Value {
-    Integer(i64),
-    Float(f64),
-    String(String),
-    BuiltInFunction(String),
-    Function{body: Arc<AST>, args: Vec<String>, scope: Ref<Scope>},
-    None,
-}
-
 type BuiltInFunctionType = fn(&Location, Vec<Value>) -> Value;
 type Ref<T> = Arc<Mutex<T>>;
 
@@ -87,43 +77,8 @@ impl Interpreter {
 
     fn run(&mut self, ast: &Arc<AST>, scope: &mut Ref<Scope>) -> Value {
         match ast.as_ref() {
-            AST::Call(loc, func, args) => {
-                let func = self.run(func, scope);
-                let args: Vec<_> = args.iter().map(|arg| self.run(arg, scope)).collect();
-
-                match &func {
-                    Value::BuiltInFunction(func) => {
-                        match self.builtins.get(func) {
-                            Some(func) => func(loc, args),
-                            None => unreachable!("{loc}: Built-in function {:?} not found", func)
-                        }
-                    }
-                    Value::Function{ body, args: func_args, scope: closure_scope } => {
-                        let mut new_scope = Arc::new(Mutex::new(Scope {
-                            vars: HashMap::new(),
-                            parent: Some(closure_scope.clone()),
-                            in_function: true,
-                        }));
-                        if args.len() != func_args.len() {
-                            error!("{loc}: Expected {} arguments, got {}", func_args.len(), args.len())
-                        }
-                        for (arg, value) in func_args.iter().zip(args) {
-                            new_scope.lock().unwrap().insert(arg.clone(), value, false);
-                        }
-                        self.run(body, &mut new_scope);
-                        let value = if let ControlFlowDecision::Return(value) = &self.control_flow {
-                            value.clone()
-                        } else {
-                            Value::None
-                        };
-                        self.control_flow = ControlFlowDecision::None;
-                        value
-                    }
-                    _ => error!("{loc}: Can't call object {:?}", func)
-                }
-            },
             AST::Block(_, stmts) => {
-                let mut last = Value::None;
+                let mut last = Value::Nothing;
                 for stmt in stmts {
                     last = self.run(stmt, scope);
                     match self.control_flow {
@@ -133,9 +88,27 @@ impl Interpreter {
                 }
                 last
             },
+            AST::Call(loc, func, args) => {
+                self.handle_call(scope, loc, func, args)
+            },
+            AST::If(loc, cond, body, else_body) => {
+                let cond = self.run(cond, scope);
+                match cond {
+                    Value::Boolean(true) => self.run(body, scope),
+                    Value::Boolean(false) => {
+                        match else_body {
+                            Some(else_body) => self.run(else_body, scope),
+                            None => Value::Nothing,
+                        }
+                    },
+                    _ => error!("{loc}: If condition must be a boolean")
+                }
+            },
+            AST::BooleanLiteral(_, value) => Value::Boolean(*value),
             AST::IntegerLiteral(_, num) => Value::Integer(*num),
             AST::FloatLiteral(_, num) => Value::Float(*num),
             AST::StringLiteral(_, string) => Value::String(string.clone()),
+            AST::Nothing(_) => Value::Nothing,
             AST::VarDeclaration(_, name, value) => {
                 if scope.lock().unwrap().vars.contains_key(name) {
                     error!("Variable {} already exists in scope", name)
@@ -163,6 +136,19 @@ impl Interpreter {
                     _ => error!("{loc}: Can't assign to {:?}", lhs)
                 }
             },
+            AST::Not(loc, expr) => {
+                Value::Boolean(!self.get_boolean_value(scope, loc, expr))
+            }
+            AST::And(loc, left, right) => {
+                let left = self.get_boolean_value(scope, loc, left);
+                let right = self.get_boolean_value(scope, loc, right);
+                Value::Boolean(left && right)
+            }
+            AST::Or(loc, left, right) => {
+                let left = self.get_boolean_value(scope, loc, left);
+                let right = self.get_boolean_value(scope, loc, right);
+                Value::Boolean(left || right)
+            }
             AST::Index(loc, left, right) => {
                 let left = self.run(left, scope);
                 let right = self.run(right, scope);
@@ -277,8 +263,51 @@ impl Interpreter {
                     error!("{loc}: Return statement outside of function")
                 }
                 self.control_flow = ControlFlowDecision::Return(self.run(val, scope));
-                Value::None
+                Value::Nothing
             },
+        }
+    }
+
+    fn handle_call(&mut self, scope: &mut Ref<Scope>, loc: &Location, func: &Arc<AST>, args: &Vec<Arc<AST>>) -> Value {
+        let func = self.run(func, scope);
+        let args: Vec<_> = args.iter().map(|arg| self.run(arg, scope)).collect();
+
+        match &func {
+            Value::BuiltInFunction(func) => {
+                match self.builtins.get(func) {
+                    Some(func) => func(loc, args),
+                    None => unreachable!("{loc}: Built-in function {:?} not found", func)
+                }
+            }
+            Value::Function{ body, args: func_args, scope: closure_scope } => {
+                let mut new_scope = Arc::new(Mutex::new(Scope {
+                    vars: HashMap::new(),
+                    parent: Some(closure_scope.clone()),
+                    in_function: true,
+                }));
+                if args.len() != func_args.len() {
+                    error!("{loc}: Expected {} arguments, got {}", func_args.len(), args.len())
+                }
+                for (arg, value) in func_args.iter().zip(args) {
+                    new_scope.lock().unwrap().insert(arg.clone(), value, false);
+                }
+                self.run(body, &mut new_scope);
+                let value = if let ControlFlowDecision::Return(value) = &self.control_flow {
+                    value.clone()
+                } else {
+                    Value::Nothing
+                };
+                self.control_flow = ControlFlowDecision::None;
+                value
+            }
+            _ => error!("{loc}: Can't call object {:?}", func)
+        }
+    }
+
+    fn get_boolean_value(&mut self, scope: &mut Ref<Scope>, loc: &Location, val: &Arc<AST>) -> bool {
+        match self.run(val, scope) {
+            Value::Boolean(b) => b,
+            _ => error!("{loc}: Expected boolean value")
         }
     }
 }

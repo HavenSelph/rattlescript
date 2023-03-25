@@ -125,6 +125,22 @@ impl Parser {
                 self.consume_line_end();
                 Arc::new(AST::VarDeclaration(loc, ident.text, expr))
             }
+            Token { kind: TokenKind::If, loc, ..} => {
+                self.increment();
+                let cond = self.parse_expression();
+                let body = self.parse_block(/*global*/ false);
+                match self.cur() {
+                    Token { kind: TokenKind::Else, loc, ..} => {
+                        self.increment();
+                        let else_body = match self.cur().kind {
+                            TokenKind::If => self.parse_statement(),
+                            _ => self.parse_block(/*global*/ false)
+                        };
+                        Arc::new(AST::If(loc, cond, body, Some(else_body)))
+                    }
+                    _ => Arc::new(AST::If(loc, cond, body, None))
+                }
+            }
             Token { kind: TokenKind::Def, ..} => {
                 self.parse_function().0
             },
@@ -163,15 +179,45 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self) -> Arc<AST> {
-        let left = self.parse_additive();
+        let left = self.parse_logical_or();
         match self.cur() {
             Token { kind: TokenKind::Equals, loc, ..} => {
                 self.increment();
-                let right = self.parse_additive();
+                let right = self.parse_logical_or();
                 Arc::new(AST::Assignment(loc, left, right))
             }
             _ => left
         }
+    }
+
+    fn parse_logical_or(&mut self) -> Arc<AST> {
+        let mut left = self.parse_logical_and();
+        loop {
+            match self.cur() {
+                Token { kind: TokenKind::Or, loc, ..} => {
+                    self.increment();
+                    let right = self.parse_logical_and();
+                    left = Arc::new(AST::Or(loc, left, right));
+                },
+                _ => break
+            }
+        }
+        return left
+    }
+
+    fn parse_logical_and(&mut self) -> Arc<AST> {
+        let mut left = self.parse_additive();
+        loop {
+            match self.cur() {
+                Token { kind: TokenKind::And, loc, ..} => {
+                    self.increment();
+                    let right = self.parse_additive();
+                    left = Arc::new(AST::And(loc, left, right));
+                },
+                _ => break
+            }
+        }
+        return left
     }
 
     fn parse_additive(&mut self) -> Arc<AST> {
@@ -194,13 +240,13 @@ impl Parser {
     }
 
     fn parse_multiplicative(&mut self) -> Arc<AST> {
-        let mut left = self.parse_postfix();
+        let mut left = self.parse_prefix();
         loop {
             match self.cur() {
                 Token { kind: TokenKind::Star | TokenKind::Slash, loc, ..} => {
                     let op = self.cur().kind;
                     self.increment();
-                    let right = self.parse_postfix();
+                    let right = self.parse_prefix();
                     left = match op {
                         TokenKind::Star => Arc::new(AST::Multiply(loc, left, right)),
                         TokenKind::Slash => Arc::new(AST::Divide(loc, left, right)),
@@ -216,6 +262,18 @@ impl Parser {
         match self.cur().kind {
             TokenKind::Colon | TokenKind::RightBracket => None,
             _ => Some(self.parse_expression())
+        }
+    }
+
+    fn parse_prefix(&mut self) -> Arc<AST> {
+        match self.cur().kind {
+            TokenKind::Not => {
+                let loc = self.cur().loc.clone();
+                self.increment();
+                let expr = self.parse_prefix();
+                Arc::new(AST::Not(loc, expr))
+            }
+            _ => self.parse_postfix()
         }
     }
 
@@ -266,7 +324,7 @@ impl Parser {
                                 match self.cur().kind {
                                     TokenKind::Comma => self.increment(),
                                     TokenKind::RightParen => {}
-                                    _ => error!("{}: Expected `)` or `,`", self.cur().loc)
+                                    _ => error!("{}: Expected `)` or `,` but got {:?}", self.cur().loc, self.cur().kind)
                                 }
                             }
                         }
@@ -318,6 +376,18 @@ impl Parser {
             Token { kind: TokenKind::Identifier, loc, text, ..} => {
                 self.increment();
                 Arc::new(AST::Variable(loc, text))
+            },
+            Token { kind: TokenKind::True, loc, ..} => {
+                self.increment();
+                Arc::new(AST::BooleanLiteral(loc, true))
+            },
+            Token { kind: TokenKind::False, loc, ..} => {
+                self.increment();
+                Arc::new(AST::BooleanLiteral(loc, false))
+            },
+            Token { kind:TokenKind::Nothing, loc, ..} => {
+                self.increment();
+                Arc::new(AST::Nothing(loc))
             },
             _ => error!("{}: Unexpected token in parse_atom: {}", self.cur().loc, self.cur())
         }

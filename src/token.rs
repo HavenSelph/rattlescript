@@ -16,31 +16,39 @@ impl Display for Location {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
+    And,
     At,
     Colon,
     Comma,
     Def,
-    Equals,
     EOF,
+    Else,
+    Equals,
+    False,
     FatArrow,
     FloatLiteral,
     Identifier,
+    If,
     IntegerLiteral,
+    LeftBrace,
     LeftBracket,
     LeftParen,
-    LeftBrace,
     Let,
     Minus,
+    Not,
+    Nothing,
+    Or,
     Pipe,
     Plus,
     Return,
+    RightBrace,
     RightBracket,
     RightParen,
-    RightBrace,
     SemiColon,
     Slash,
     Star,
     StringLiteral,
+    True,
 }
 
 #[derive(Debug, Clone)]
@@ -64,9 +72,17 @@ impl Token {
     pub fn from_str(text: String, loc: Location) -> Token {
         Token {
             kind: match text.as_ref() {
-                "let" => TokenKind::Let,
+                "and" => TokenKind::And,
                 "def" => TokenKind::Def,
+                "else" => TokenKind::Else,
+                "false" => TokenKind::False,
+                "if" => TokenKind::If,
+                "let" => TokenKind::Let,
+                "not" => TokenKind::Not,
+                "nothing" => TokenKind::Nothing,
+                "or" => TokenKind::Or,
                 "return" => TokenKind::Return,
+                "true" => TokenKind::True,
                 _ => TokenKind::Identifier
             },
             loc,

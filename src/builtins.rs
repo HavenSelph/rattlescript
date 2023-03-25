@@ -11,12 +11,13 @@ pub fn print(_loc: &Location, args: Vec<Value>) -> Value {
             Value::Integer(num) => print!("{}", num),
             Value::Float(num) => print!("{}", num),
             Value::String(string) => print!("{}", string),
-            Value::None => print!("None"),
+            Value::Boolean(boolean) => print!("{}", boolean),
+            Value::Nothing => print!("nothing"),
             _ => print!("{:?}", arg)
         }
     }
     println!();
-    Value::None
+    Value::Nothing
 }
 
 pub fn len(loc: &Location, args: Vec<Value>) -> Value {
