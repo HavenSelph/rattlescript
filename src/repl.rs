@@ -4,7 +4,7 @@ use crate::ast::AST;
 use std::collections::HashMap;
 use std::io::Write;
 use std::rc::Rc;
-use std::sync::Mutex;
+use std::cell::RefCell;
 use crate::value::Value;
 
 pub struct Repl {
@@ -15,7 +15,7 @@ pub struct Repl {
 impl Repl {
     pub fn new() -> Repl {
         let interpreter = Interpreter::new();
-        let global_scope = Rc::new(Mutex::new(Scope {
+        let global_scope = Rc::new(RefCell::new(Scope {
             vars: HashMap::new(),
             parent: None,
             in_function: false,

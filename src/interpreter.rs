@@ -3,9 +3,9 @@ use crate::builtin;
 use crate::token::Location;
 use crate::error::{runtime_error as error, Result};
 use crate::value::{IteratorValue, Value};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct Scope {
@@ -20,7 +20,7 @@ impl Scope {
             self.vars.insert(name, value);
         } else {
             match &self.parent {
-                Some(parent) => parent.lock().unwrap().insert(name, value, update, loc)?,
+                Some(parent) => parent.borrow_mut().insert(name, value, update, loc)?,
                 None => error!(loc, "Variable {} not found, couldn't update", name),
             }
         }
@@ -32,7 +32,7 @@ impl Scope {
             self.vars.get(name).cloned()
         } else {
             match &self.parent {
-                Some(parent) => parent.lock().unwrap().get(name),
+                Some(parent) => parent.borrow_mut().get(name),
                 None => None,
             }
         }
@@ -40,9 +40,9 @@ impl Scope {
 }
 
 type BuiltInFunctionType = fn(&Location, Vec<Value>) -> Result<Value>;
-pub type Ref<T> = Rc<Mutex<T>>;
+pub type Ref<T> = Rc<RefCell<T>>;
 
-enum ControlFlowDecision {
+enum ControlFlow {
     None,
     Continue,
     Break,
@@ -51,7 +51,7 @@ enum ControlFlowDecision {
 
 pub struct Interpreter {
     builtins: HashMap<&'static str, BuiltInFunctionType>,
-    control_flow: ControlFlowDecision,
+    control_flow: ControlFlow,
 }
 
 impl Interpreter {
@@ -61,12 +61,12 @@ impl Interpreter {
 
         Interpreter {
             builtins,
-            control_flow: ControlFlowDecision::None,
+            control_flow: ControlFlow::None,
         }
     }
 
     pub fn execute(&mut self, ast: &Rc<AST>) -> Result<Value> {
-        let scope = Rc::new(Mutex::new(Scope {
+        let scope = Rc::new(RefCell::new(Scope {
             vars: HashMap::new(),
             parent: None,
             in_function: false,
@@ -81,7 +81,7 @@ impl Interpreter {
                 for stmt in stmts {
                     last = self.run(stmt, scope.clone())?;
                     match self.control_flow {
-                        ControlFlowDecision::None => {}
+                        ControlFlow::None => {}
                         _ => break,
                     }
                 }
@@ -108,10 +108,10 @@ impl Interpreter {
 
         Ok(match ast.as_ref() {
             AST::Block(..) => {
-                let block_scope = Rc::new(Mutex::new(Scope {
+                let block_scope = Rc::new(RefCell::new(Scope {
                     vars: HashMap::new(),
                     parent: Some(scope.clone()),
-                    in_function: scope.lock().unwrap().in_function,
+                    in_function: scope.borrow_mut().in_function,
                 }));
                 self.run_block_without_scope(ast, block_scope)?
             }
@@ -134,15 +134,13 @@ impl Interpreter {
                         Value::Boolean(true) => {
                             self.run(body, scope.clone())?;
                             match self.control_flow {
-                                ControlFlowDecision::None => {}
-                                ControlFlowDecision::Continue => {
-                                    self.control_flow = ControlFlowDecision::None
-                                }
-                                ControlFlowDecision::Break => {
-                                    self.control_flow = ControlFlowDecision::None;
+                                ControlFlow::None => {}
+                                ControlFlow::Continue => self.control_flow = ControlFlow::None,
+                                ControlFlow::Break => {
+                                    self.control_flow = ControlFlow::None;
                                     break;
                                 }
-                                ControlFlowDecision::Return(_) => break,
+                                ControlFlow::Return(_) => break,
                             }
                         }
                         Value::Boolean(false) => break,
@@ -160,20 +158,18 @@ impl Interpreter {
                             let mut loop_scope = Scope {
                                 vars: HashMap::new(),
                                 parent: Some(scope.clone()),
-                                in_function: scope.lock().unwrap().in_function,
+                                in_function: scope.borrow_mut().in_function,
                             };
                             loop_scope.insert(loop_var.clone(), val.clone(), false, loc)?;
-                            self.run(body, Rc::new(Mutex::new(loop_scope)))?;
+                            self.run(body, Rc::new(RefCell::new(loop_scope)))?;
                             match self.control_flow {
-                                ControlFlowDecision::None => {}
-                                ControlFlowDecision::Continue => {
-                                    self.control_flow = ControlFlowDecision::None
-                                }
-                                ControlFlowDecision::Break => {
-                                    self.control_flow = ControlFlowDecision::None;
+                                ControlFlow::None => {}
+                                ControlFlow::Continue => self.control_flow = ControlFlow::None,
+                                ControlFlow::Break => {
+                                    self.control_flow = ControlFlow::None;
                                     break;
                                 }
-                                ControlFlowDecision::Return(_) => break,
+                                ControlFlow::Return(_) => break,
                             }
                         }
                     }
@@ -187,7 +183,7 @@ impl Interpreter {
             AST::StringLiteral(_, string) => Value::String(string.clone()),
             AST::Nothing(_) => Value::Nothing,
             AST::VarDeclaration(loc, name, value) => {
-                if scope.lock().unwrap().vars.contains_key(name) {
+                if scope.borrow_mut().vars.contains_key(name) {
                     error!(loc, "Variable {} already exists in scope", name)
                 }
                 if self.builtins.contains_key(name.as_str()) {
@@ -198,8 +194,7 @@ impl Interpreter {
                 }
                 let value = self.run(value, scope.clone())?;
                 scope
-                    .lock()
-                    .unwrap()
+                    .borrow_mut()
                     .insert(name.clone(), value.clone(), false, loc)?;
                 value
             }
@@ -207,15 +202,14 @@ impl Interpreter {
                 let value = self.run(value, scope.clone())?;
                 match lhs.as_ref() {
                     AST::Variable(loc, name) => {
-                        if scope.lock().unwrap().get(name).is_none() {
+                        if scope.borrow_mut().get(name).is_none() {
                             error!(loc, "Variable {} doesn't exist", name)
                         }
                         if self.builtins.contains_key(name.as_str()) {
                             error!(loc, "`{}` is a built-in function, can't override it", name)
                         }
                         scope
-                            .lock()
-                            .unwrap()
+                            .borrow_mut()
                             .insert(name.clone(), value.clone(), true, loc)?;
                         value
                     }
@@ -238,7 +232,7 @@ impl Interpreter {
             AST::Variable(loc, name) => {
                 if self.builtins.get(name.as_str()).is_some() {
                     Value::BuiltInFunction(name.clone())
-                } else if let Some(value) = scope.lock().unwrap().get(name) {
+                } else if let Some(value) = scope.borrow_mut().get(name) {
                     value
                 } else {
                     error!(loc, "Variable {} not found", name)
@@ -304,8 +298,7 @@ impl Interpreter {
                 match name {
                     Some(name) => {
                         scope
-                            .lock()
-                            .unwrap()
+                            .borrow_mut()
                             .insert(name.clone(), func.clone(), false, loc)?
                     }
                     None => {}
@@ -313,18 +306,18 @@ impl Interpreter {
                 func
             }
             AST::Return(loc, val) => {
-                if !scope.lock().unwrap().in_function {
+                if !scope.borrow_mut().in_function {
                     error!(loc, "Return statement outside of function")
                 }
-                self.control_flow = ControlFlowDecision::Return(self.run(val, scope)?);
+                self.control_flow = ControlFlow::Return(self.run(val, scope)?);
                 Value::Nothing
             }
             AST::Break(_loc) => {
-                self.control_flow = ControlFlowDecision::Break;
+                self.control_flow = ControlFlow::Break;
                 Value::Nothing
             }
             AST::Continue(_loc) => {
-                self.control_flow = ControlFlowDecision::Continue;
+                self.control_flow = ControlFlow::Continue;
                 Value::Nothing
             }
             AST::Assert(loc, cond) => {
@@ -371,7 +364,7 @@ impl Interpreter {
                 scope: closure_scope,
                 ..
             } => {
-                let new_scope = Rc::new(Mutex::new(Scope {
+                let new_scope = Rc::new(RefCell::new(Scope {
                     vars: HashMap::new(),
                     parent: Some(closure_scope.clone()),
                     in_function: true,
@@ -386,17 +379,16 @@ impl Interpreter {
                 }
                 for (arg, value) in func_args.iter().zip(args) {
                     new_scope
-                        .lock()
-                        .unwrap()
+                        .borrow_mut()
                         .insert(arg.clone(), value, false, loc)?;
                 }
                 self.run(body, new_scope)?;
-                let value = if let ControlFlowDecision::Return(value) = &self.control_flow {
+                let value = if let ControlFlow::Return(value) = &self.control_flow {
                     value.clone()
                 } else {
                     Value::Nothing
                 };
-                self.control_flow = ControlFlowDecision::None;
+                self.control_flow = ControlFlow::None;
                 value
             }
             _ => error!(loc, "Can't call object {:?}", func),
