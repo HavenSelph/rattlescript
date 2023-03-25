@@ -54,9 +54,17 @@ pub struct Interpreter {
     control_flow: ControlFlow,
 }
 
+macro_rules! builtins {
+    ($($name:ident),+ $(,)?) => {
+        HashMap::from([$(
+            (stringify!($name), builtin::$name as BuiltInFunctionType),
+        )+])
+    };
+}
+
 impl Interpreter {
     pub fn new() -> Interpreter {
-        let builtins = HashMap::from([("print", builtin::print as _), ("len", builtin::len as _)]);
+        let builtins = builtins!(print, len, exit);
 
         Interpreter {
             builtins,

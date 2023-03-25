@@ -1,5 +1,5 @@
-use crate::token::{Location, Token, TokenKind};
 use crate::error::{lexer_error as error, Result};
+use crate::token::{Location, Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer {

@@ -1,5 +1,5 @@
-use crate::token::Location;
 use crate::error::{runtime_error as error, Result};
+use crate::token::Location;
 use crate::value::Value;
 
 pub fn print(_loc: &Location, args: Vec<Value>) -> Result<Value> {
@@ -31,4 +31,20 @@ pub fn len(loc: &Location, args: Vec<Value>) -> Result<Value> {
         Value::String(string) => Value::Integer(string.len() as i64),
         other => error!(loc, "len() does not support {:?}", other),
     })
+}
+
+pub fn exit(loc: &Location, args: Vec<Value>) -> Result<Value> {
+    let code = match args.get(0) {
+        Some(Value::Integer(i)) => *i,
+        Some(_) => error!(loc, "exit() may only take an integer as argument"),
+        None => 0,
+    };
+
+    match code.try_into() {
+        Ok(code) => std::process::exit(code),
+        Err(_) => error!(
+            loc,
+            "argument to exit() is too large, {code} does not fit into an i32"
+        ),
+    }
 }
