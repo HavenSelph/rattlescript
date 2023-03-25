@@ -1,13 +1,14 @@
-use crate::utils::Result;
+use crate::error::Result;
 use std::process::exit;
 
 mod ast;
-mod builtins;
+mod builtin;
+mod error;
 mod interpreter;
 mod lexer;
 mod parser;
+mod repl;
 mod token;
-mod utils;
 mod value;
 
 
@@ -21,7 +22,9 @@ fn main() -> Result<()> {
         exit(1);
     }
     if args.repl {
-        unimplemented!()
+        let mut repl = repl::Repl::new();
+        repl.run();
+        exit(0)
     }
     let file = if let Some(ref file) = args.file {
         std::fs::read_to_string(file).expect("Couldn't open input file")

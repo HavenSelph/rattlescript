@@ -1,7 +1,7 @@
-use crate::ast::Ast;
+use crate::ast::AST;
 use crate::interpreter::{Ref, Scope};
 use crate::token::Location;
-use crate::utils::{runtime_error as error, Result};
+use crate::error::{runtime_error as error, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -55,7 +55,7 @@ pub enum Value {
     Iterator(IteratorValue),
     Range(i64, i64),
     Function {
-        body: Rc<Ast>,
+        body: Rc<AST>,
         args: Vec<String>,
         scope: Ref<Scope>,
     },
@@ -211,6 +211,20 @@ impl Value {
             Value::String(s) => Value::Iterator(IteratorValue::for_string(s)),
             Value::Range(start, end) => Value::Iterator(IteratorValue::for_range(start, end)),
             _ => self,
+        }
+    }
+
+    pub fn repr(&self) -> String {
+        match self {
+            Value::Integer(i) => i.to_string(),
+            Value::Float(f) => f.to_string(),
+            Value::String(s) => format!("\"{}\"", s),
+            Value::Boolean(b) => b.to_string(),
+            Value::Range(start, end) => format!("{}..{}", start, end),
+            Value::Iterator(_) => "<iterator>".to_string(),
+            Value::Function{..} => "<function>".to_string(),
+            Value::BuiltInFunction(name) => format!("<built-in function {}>", name),
+            Value::Nothing => "nothing".to_string()
         }
     }
 }

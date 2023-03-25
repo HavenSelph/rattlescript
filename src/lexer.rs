@@ -1,5 +1,5 @@
 use crate::token::{Location, Token, TokenKind};
-use crate::utils::{lexer_error as error, Result};
+use crate::error::{lexer_error as error, Result};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -175,7 +175,7 @@ impl Lexer {
                 _ => error!(self.location, "Unexpected character {}", c),
             }
         }
-        self.push_simple(&mut tokens, TokenKind::Eof, 0);
+        self.push_simple(&mut tokens, TokenKind::EOF, 0);
         Ok(tokens)
     }
 

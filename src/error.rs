@@ -5,6 +5,7 @@ use crate::token::Location;
 pub enum Error {
     Lexer(Location, String),
     Parser(Location, String),
+    UnexpectedEOF(Location, String),
     Runtime(Location, String),
     Other(String),
 }
@@ -13,21 +14,28 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! lexer_error {
     ($loc:expr, $($arg:tt)*) => {
-        return Err(crate::utils::Error::Lexer($loc.clone(), format!($($arg)*)))
+        return Err(crate::error::Error::Lexer($loc.clone(), format!($($arg)*)))
     }
 }
 pub(crate) use lexer_error;
 
 macro_rules! parser_error {
     ($loc:expr, $($arg:tt)*) => {
-        return Err(crate::utils::Error::Parser($loc.clone(), format!($($arg)*)))
+        return Err(crate::error::Error::Parser($loc.clone(), format!($($arg)*)))
     }
 }
 pub(crate) use parser_error;
 
+macro_rules! eof_error {
+    ($loc:expr, $($arg:tt)*) => {
+        return Err(crate::error::Error::UnexpectedEOF($loc.clone(), format!("Unexpected EOF: {}", format!($($arg)*))))
+    }
+}
+pub(crate) use eof_error;
+
 macro_rules! runtime_error {
     ($loc:expr, $($arg:tt)*) => {
-        return Err(crate::utils::Error::Runtime($loc.clone(), format!($($arg)*)))
+        return Err(crate::error::Error::Runtime($loc.clone(), format!($($arg)*)))
     }
 }
 pub(crate) use runtime_error;
