@@ -50,9 +50,15 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Rc<AST>> {
-        let res = self.parse_block(/*global*/ true);
-        self.consume(TokenKind::EOF)?;
-        res
+        match self.parse_block(/*global*/ true) {
+            Ok(ast) => {
+                self.consume(TokenKind::EOF)?;  // should never fail, but maybe there's an edge case?
+                Ok(ast)
+            },  // If it's already an error, don't print another one
+            Err(e) => {
+                Err(e)
+            }
+        }
     }
 
     fn parse_block(&mut self, global: bool) -> Result<Rc<AST>> {
