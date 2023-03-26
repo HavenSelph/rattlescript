@@ -78,10 +78,10 @@ impl Lexer {
                     let mut num = String::new();
 
                     let base = match self.peek(1) {
-                        Some('b') => Base::Bin,
-                        Some('o') => Base::Oct,
-                        Some('x') => Base::Hex,
-                        _ => Base::Dec,
+                        Some('b') => Base::Binary,
+                        Some('o') => Base::Octal,
+                        Some('x') => Base::Hexadecimal,
+                        _ => Base::Decimal,
                     };
 
                     self.increment();
@@ -99,7 +99,7 @@ impl Lexer {
                     let loc = self.location.clone();
                     let mut num = String::new();
 
-                    self.lex_num(&mut num, Base::Dec)?;
+                    self.lex_num(&mut num, Base::Decimal)?;
                     if let Some('.') = self.cur() {
                         if let Some('.') = self.peek(1) {
                             self.push(
@@ -109,7 +109,7 @@ impl Lexer {
                         } else {
                             num.push('.');
                             self.increment();
-                            self.lex_num(&mut num, Base::Dec)?;
+                            self.lex_num(&mut num, Base::Decimal)?;
                             self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
                         }
                     } else {
@@ -218,15 +218,16 @@ impl Lexer {
         while let Some(mut c) = self.cur() {
             c = c.to_ascii_lowercase();
             match (base, c) {
-                (Base::Bin, '0'..='1')
-                | (Base::Oct, '0'..='7')
-                | (Base::Dec, '0'..='9')
-                | (Base::Hex, '0'..='9' | 'a'..='f') => {
+                (Base::Binary, '0'..='1')
+                | (Base::Octal, '0'..='7')
+                | (Base::Decimal, '0'..='9')
+                | (Base::Hexadecimal, '0'..='9' | 'a'..='f') => {
                     num.push(c);
                     self.increment();
                 }
                 (_, '0'..='9' | 'a'..='f') => {
-                    error!(self.location, "Invalid numerical literal");
+                    num.push(c);  // push the invalid character for the error message
+                    error!(self.location, "Invalid {:?} numerical literal '{}'", base, num);
                 }
                 (_, '_') => self.increment(),
                 _ => break,
@@ -238,19 +239,19 @@ impl Lexer {
 
 #[derive(Debug, Clone, Copy)]
 enum Base {
-    Bin,
-    Oct,
-    Dec,
-    Hex,
+    Binary,
+    Octal,
+    Decimal,
+    Hexadecimal,
 }
 
 impl From<Base> for TokenKind {
     fn from(value: Base) -> Self {
         match value {
-            Base::Bin => Self::IntegerLiteralBin,
-            Base::Oct => Self::IntegerLiteralOct,
-            Base::Dec => Self::IntegerLiteralDec,
-            Base::Hex => Self::IntegerLiteralHex,
+            Base::Binary => Self::IntegerLiteralBin,
+            Base::Octal => Self::IntegerLiteralOct,
+            Base::Decimal => Self::IntegerLiteralDec,
+            Base::Hexadecimal => Self::IntegerLiteralHex,
         }
     }
 }
