@@ -67,15 +67,48 @@ pub fn show_file_context(loc: Location, msg: String) {
         &loc.line - context - 1
     };
     let max_line = lines.len().min(&loc.line + context);
-    println!("╭───────────────────────────────────────────────────────────────");
+    println!("╭─────────────────────────────────────────────────────────────────────────────────");
     println!("│ {}: Error: {}", loc.clone(), msg);
-    println!("├────┬──────────────────────────────────────────────────────────");
+    println!("├────┬────────────────────────────────────────────────────────────────────────────");
     for line_no in min_line..max_line {
         let line = lines[line_no];
-        println!("│{:>3} │ {}", line_no, line);
-        if line_no == loc.line - 1 {
-            println!("│    ├─{}┘ \x1b[0;31m{}\x1b[0m", "─".repeat(loc.column - 1), msg);
+        let mut trunc = false;
+        if !(line_no == loc.line - 1) {
+            let line_min = 0;
+            let line_max = match std::cmp::min(line.len(),75) {
+                x if x == line.len() => x,
+                x=> {
+                    trunc = true;
+                    x - 4
+                }
+            };
+            let line = match trunc {
+                true => format!("{} ...", &line[line_min..line_max]),
+                false => line[line_min..line_max].to_string(),
+            };
+            let line_max = std::cmp::min(line.len(),75);
+            println!("│{:>3} │ {}", line_no, &line[line_min..line_max]);
+        } else {
+            let line_max = std::cmp::min(line.len(),loc.column + 10);
+            let line_min = match loc.column.saturating_sub(74) {
+                0 => 0,
+                x=> {
+                    trunc = true;
+                    x + 4
+                }
+            };
+            let line = match trunc {
+                true => format!("... {}", &line[line_min..line_max]),
+                false => line[line_min..line_max].to_string(),
+            };
+            let column = match trunc {
+                true => loc.column - line_min + 4,
+                false => loc.column - line_min,
+            };
+            println!("│{:>3} │ {}", line_no, line);
+            println!("│    ├╌{}▲", "╌".repeat((column) - 1));
+            println!("|    |{}\x1b[0;31m{}\x1b[0m", " ".repeat(std::cmp::max(0, column-msg.len()+1)), msg)
         }
     }
-    println!("╰────┴──────────────────────────────────────────────────────────");
+    println!("╰────┴────────────────────────────────────────────────────────────────────────────");
 }
