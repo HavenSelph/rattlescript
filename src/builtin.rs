@@ -50,8 +50,16 @@ pub fn exit(loc: &Location, args: Vec<Value>) -> Result<Value> {
 }
 
 pub fn input(loc: &Location, args: Vec<Value>) -> Result<Value> {
-    if args.len() != 0 {
-        error!(loc, "input() takes no arguments");
+    // could be temporary, just really nice for testing.
+    if args.len() == 1 {
+        if let Value::String(string) = &args[0] {
+            print!("{}", string);
+            std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        }else{
+            error!(loc, "input() takes either no arguments or a string");
+        }
+    } else if args.len() > 1 {
+        error!(loc, "input() takes either no arguments or a string");
     }
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
