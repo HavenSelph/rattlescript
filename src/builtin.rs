@@ -48,3 +48,18 @@ pub fn exit(loc: &Location, args: Vec<Value>) -> Result<Value> {
         ),
     }
 }
+
+pub fn input(loc: &Location, args: Vec<Value>) -> Result<Value> {
+    if args.len() != 0 {
+        error!(loc, "input() takes no arguments");
+    }
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    if input.ends_with('\n') {
+        input.pop();
+        if input.ends_with('\r') {
+            input.pop();
+        }
+    }
+    Ok(Value::String(input))
+}
