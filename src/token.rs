@@ -1,19 +1,8 @@
-use std::fmt::{Display, Error};
 
-#[derive(Debug, Clone)]
-pub struct Location {
-    pub line: usize,
-    pub column: usize,
-    pub filename: String,
-}
+use crate::common::Span;
 
-impl Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}:{}:{}", self.filename, self.line, self.column)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TokenKind {
     And,
     Assert,
@@ -44,16 +33,18 @@ pub enum TokenKind {
     LeftBracket,
     LeftParen,
     LessThan,
-    LessThanEquals,
+    LessEquals,
     Let,
     Minus,
+    MinusMinus,
     Not,
     GreaterThan,
-    GreaterThanEquals,
+    GreaterEquals,
     Nothing,
     Or,
     Pipe,
     Plus,
+    PlusPlus,
     Return,
     RightBrace,
     RightBracket,
@@ -71,22 +62,22 @@ pub enum TokenKind {
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub loc: Location,
+    pub span: Span,
     pub text: String,
     pub newline_before: bool,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, loc: Location, text: String) -> Token {
+    pub fn new(kind: TokenKind, span: Span, text: String) -> Token {
         Token {
             kind,
-            loc,
+            span,
             text,
             newline_before: false,
         }
     }
 
-    pub fn from_str(text: String, loc: Location) -> Token {
+    pub fn from_str(text: String, span: Span) -> Token {
         Token {
             kind: match text.as_ref() {
                 "and" => TokenKind::And,
@@ -108,15 +99,15 @@ impl Token {
                 "in" => TokenKind::In,
                 _ => TokenKind::Identifier,
             },
-            loc,
+            span,
             text,
             newline_before: false,
         }
     }
 }
 
-impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{:?}", self.kind)?;
         if !self.text.is_empty() {
             write!(f, "({})", self.text)?;

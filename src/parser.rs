@@ -38,10 +38,10 @@ impl Parser {
             self.increment();
             Ok(res)
         } else if self.cur().kind == TokenKind::EOF {
-            eof_error!(self.cur().loc, "Expected token {:?}", kind);
+            eof_error!(self.cur().span, "Expected token {:?}", kind);
         } else {
             error!(
-                self.cur().loc,
+                self.cur().span,
                 "Expected token {:?}, but got {:?}",
                 kind,
                 self.cur().kind
@@ -50,34 +50,30 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Rc<AST>> {
-        match self.parse_block(/*global*/ true) {
-            Ok(ast) => {
-                self.consume(TokenKind::EOF)?;  // should never fail, but maybe there's an edge case?
-                Ok(ast)
-            },  // If it's already an error, don't print another one
-            Err(e) => {
-                Err(e)
-            }
-        }
+        let res = self.parse_block(/*global*/ true)?;
+        self.consume(TokenKind::EOF)?;
+        Ok(res)
     }
 
     fn parse_block(&mut self, global: bool) -> Result<Rc<AST>> {
-        let loc = self.cur().loc;
+        let mut span = self.cur().span;
         let mut statements = vec![];
         if !global {
             self.consume(TokenKind::LeftBrace)?;
         }
         loop {
             if !global && self.cur().kind == TokenKind::RightBrace {
+                span = span.extend(&self.cur().span);
                 self.increment();
                 break;
             }
             if global && self.cur().kind == TokenKind::EOF {
+                span = span.extend(&self.cur().span);
                 break;
             }
             statements.push(self.parse_statement()?);
         }
-        Ok(Rc::new(AST::Block(loc, statements)))
+        Ok(Rc::new(AST::Block(span, statements)))
     }
 
     fn consume_line_end(&mut self) -> Result<()> {
@@ -88,7 +84,7 @@ impl Parser {
             TokenKind::SemiColon => self.increment(),
             TokenKind::EOF => {}
             _ => error!(
-                self.cur().loc,
+                self.cur().span,
                 "Expected line end, but got {:?}",
                 self.cur().kind
             ),
@@ -97,7 +93,7 @@ impl Parser {
     }
 
     fn parse_lambda(&mut self) -> Result<Rc<AST>> {
-        let loc = self.consume(TokenKind::Pipe)?.loc;
+        let start = self.consume(TokenKind::Pipe)?.span;
         let mut args = vec![];
         while self.cur().kind != TokenKind::Pipe {
             args.push(self.consume(TokenKind::Identifier)?.text);
@@ -108,12 +104,13 @@ impl Parser {
         self.increment();
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
-            Rc::new(AST::Return(loc.clone(), self.parse_expression()?))
+            let expr = self.parse_expression()?;
+            Rc::new(AST::Return(*expr.span(), expr))
         } else {
             self.parse_block(/*global*/ false)?
         };
         Ok(Rc::new(AST::Function {
-            loc,
+            span: start.extend(body.span()),
             name: None,
             args,
             body,
@@ -121,7 +118,7 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<(Rc<AST>, String)> {
-        let loc = self.consume(TokenKind::Def)?.loc;
+        let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
         let mut args = vec![];
@@ -134,14 +131,16 @@ impl Parser {
         self.increment();
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
-            Rc::new(AST::Return(loc.clone(), self.parse_expression()?))
+            let expr = self.parse_expression()?;
+            self.consume_line_end()?;
+            Rc::new(AST::Return(*expr.span(), expr))
         } else {
             self.parse_block(/*global*/ false)?
         };
         self.consume_line_end()?;
         Ok((
             Rc::new(AST::Function {
-                loc,
+                span: start.extend(body.span()),
                 name: Some(name.text.clone()),
                 args,
                 body,
@@ -154,7 +153,7 @@ impl Parser {
         match self.cur() {
             Token {
                 kind: TokenKind::Let,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
@@ -162,20 +161,25 @@ impl Parser {
                 self.consume(TokenKind::Equals)?;
                 let expr = self.parse_expression()?;
                 self.consume_line_end()?;
-                Ok(Rc::new(AST::VarDeclaration(loc, ident.text, expr)))
+                Ok(Rc::new(AST::VarDeclaration(
+                    span.extend(expr.span()),
+                    ident.text,
+                    expr,
+                )))
             }
             Token {
                 kind: TokenKind::If,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
                 let cond = self.parse_expression()?;
                 let body = self.parse_block(/*global*/ false)?;
+                let span = span.extend(body.span());
                 match self.cur() {
                     Token {
                         kind: TokenKind::Else,
-                        loc,
+                        span,
                         ..
                     } => {
                         self.increment();
@@ -183,9 +187,14 @@ impl Parser {
                             TokenKind::If => self.parse_statement()?,
                             _ => self.parse_block(/*global*/ false)?,
                         };
-                        Ok(Rc::new(AST::If(loc, cond, body, Some(else_body))))
+                        Ok(Rc::new(AST::If(
+                            span.extend(else_body.span()),
+                            cond,
+                            body,
+                            Some(else_body),
+                        )))
                     }
-                    _ => Ok(Rc::new(AST::If(loc, cond, body, None))),
+                    _ => Ok(Rc::new(AST::If(span, cond, body, None))),
                 }
             }
             Token {
@@ -194,7 +203,7 @@ impl Parser {
             } => Ok(self.parse_function()?.0),
             Token {
                 kind: TokenKind::At,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
@@ -203,74 +212,119 @@ impl Parser {
                 let (func, name) = self.parse_function()?;
                 self.consume_line_end()?;
                 Ok(Rc::new(AST::Assignment(
-                    loc.clone(),
-                    Rc::new(AST::Variable(loc.clone(), name)),
-                    Rc::new(AST::Call(loc, deco, vec![func])),
+                    span.extend(deco.span()),
+                    Rc::new(AST::Variable(span.extend(deco.span()), name)),
+                    Rc::new(AST::Call(span.extend(deco.span()), deco, vec![func])),
                 )))
             }
             Token {
                 kind: TokenKind::Continue,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
                 self.consume_line_end()?;
-                Ok(Rc::new(AST::Continue(loc)))
+                Ok(Rc::new(AST::Continue(span)))
             }
             Token {
                 kind: TokenKind::Break,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
                 self.consume_line_end()?;
-                Ok(Rc::new(AST::Break(loc)))
+                Ok(Rc::new(AST::Break(span)))
             }
             Token {
                 kind: TokenKind::While,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
                 let cond = self.parse_expression()?;
                 let body = self.parse_block(/*global*/ false)?;
-                Ok(Rc::new(AST::While(loc, cond, body)))
+                Ok(Rc::new(AST::While(span.extend(body.span()), cond, body)))
             }
             Token {
                 kind: TokenKind::For,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
-                let ident = self.consume(TokenKind::Identifier)?;
-                self.consume(TokenKind::In)?;
-                let expr = self.parse_expression()?;
-                let body = self.parse_block(/*global*/ false)?;
-                Ok(Rc::new(AST::For(loc, ident.text, expr, body)))
+
+                if self.cur().kind == TokenKind::LeftParen {
+                    // Traditional for loop
+                    self.increment();
+                    let init = if self.cur().kind == TokenKind::SemiColon {
+                        None
+                    } else {
+                        let init = Some(self.parse_statement()?);
+                        // If we have consumed a semicolon, we need to go back one token
+                        if self.tokens[self.current_index - 1].kind == TokenKind::SemiColon {
+                            self.current_index -= 1;
+                        }
+                        init
+                    };
+                    self.consume(TokenKind::SemiColon)?;
+                    let cond = if self.cur().kind == TokenKind::SemiColon {
+                        None
+                    } else {
+                        Some(self.parse_expression()?)
+                    };
+                    self.consume(TokenKind::SemiColon)?;
+                    let step = if self.cur().kind == TokenKind::RightParen {
+                        None
+                    } else {
+                        Some(self.parse_expression()?)
+                    };
+                    self.consume(TokenKind::RightParen)?;
+                    let body = self.parse_block(/*global*/ false)?;
+                    Ok(Rc::new(AST::For {
+                        span: span.extend(body.span()),
+                        init,
+                        cond,
+                        step,
+                        body,
+                    }))
+                } else {
+                    // For each loop
+                    let ident = self.consume(TokenKind::Identifier)?;
+                    self.consume(TokenKind::In)?;
+                    let expr = self.parse_expression()?;
+                    let body = self.parse_block(/*global*/ false)?;
+                    Ok(Rc::new(AST::ForEach(
+                        span.extend(body.span()),
+                        ident.text,
+                        expr,
+                        body,
+                    )))
+                }
             }
             Token {
                 kind: TokenKind::Return,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
                 let expr = self.parse_expression()?;
                 self.consume_line_end()?;
-                Ok(Rc::new(AST::Return(loc, expr)))
+                Ok(Rc::new(AST::Return(span.extend(expr.span()), expr)))
             }
             Token {
                 kind: TokenKind::Assert,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
                 let cond = self.parse_expression()?;
+                let span = span.extend(cond.span());
                 if self.cur().kind == TokenKind::Comma {
                     self.increment();
+                    span.extend(&self.cur().span);
                     self.consume(TokenKind::StringLiteral)?;
                 }
                 self.consume_line_end()?;
-                Ok(Rc::new(AST::Assert(loc, cond)))
+                Ok(Rc::new(AST::Assert(span, cond)))
             }
             _ => {
                 let expr = self.parse_expression();
@@ -289,12 +343,15 @@ impl Parser {
         match self.cur() {
             Token {
                 kind: TokenKind::Equals,
-                loc,
                 ..
             } => {
                 self.increment();
                 let right = self.parse_comparison()?;
-                Ok(Rc::new(AST::Assignment(loc, left, right)))
+                Ok(Rc::new(AST::Assignment(
+                    left.span().extend(right.span()),
+                    left,
+                    right,
+                )))
             }
             _ => Ok(left),
         }
@@ -308,9 +365,8 @@ impl Parser {
                 | TokenKind::BangEquals
                 | TokenKind::LessThan
                 | TokenKind::GreaterThan
-                | TokenKind::LessThanEquals
-                | TokenKind::GreaterThanEquals,
-            loc,
+                | TokenKind::LessEquals
+                | TokenKind::GreaterEquals,
             ..
         } = self.cur()
         {
@@ -318,12 +374,32 @@ impl Parser {
             self.increment();
             let right = self.parse_logical_or()?;
             left = match op {
-                TokenKind::EqualsEquals => Rc::new(AST::Equals(loc, left, right)),
-                TokenKind::BangEquals => Rc::new(AST::NotEquals(loc, left, right)),
-                TokenKind::LessThan => Rc::new(AST::LessThan(loc, left, right)),
-                TokenKind::GreaterThan => Rc::new(AST::GreaterThan(loc, left, right)),
-                TokenKind::LessThanEquals => Rc::new(AST::LessThanEquals(loc, left, right)),
-                TokenKind::GreaterThanEquals => Rc::new(AST::GreaterThanEquals(loc, left, right)),
+                TokenKind::EqualsEquals => {
+                    Rc::new(AST::Equals(left.span().extend(right.span()), left, right))
+                }
+                TokenKind::BangEquals => Rc::new(AST::NotEquals(
+                    left.span().extend(right.span()),
+                    left,
+                    right,
+                )),
+                TokenKind::LessThan => {
+                    Rc::new(AST::LessThan(left.span().extend(right.span()), left, right))
+                }
+                TokenKind::GreaterThan => Rc::new(AST::GreaterThan(
+                    left.span().extend(right.span()),
+                    left,
+                    right,
+                )),
+                TokenKind::LessEquals => Rc::new(AST::LessEquals(
+                    left.span().extend(right.span()),
+                    left,
+                    right,
+                )),
+                TokenKind::GreaterEquals => Rc::new(AST::GreaterEquals(
+                    left.span().extend(right.span()),
+                    left,
+                    right,
+                )),
                 _ => unreachable!(),
             }
         }
@@ -334,13 +410,12 @@ impl Parser {
         let mut left = self.parse_logical_and()?;
         while let Token {
             kind: TokenKind::Or,
-            loc,
             ..
         } = self.cur()
         {
             self.increment();
             let right = self.parse_logical_and()?;
-            left = Rc::new(AST::Or(loc, left, right));
+            left = Rc::new(AST::Or(left.span().extend(right.span()), left, right));
         }
         Ok(left)
     }
@@ -349,13 +424,12 @@ impl Parser {
         let mut left = self.parse_additive()?;
         while let Token {
             kind: TokenKind::And,
-            loc,
             ..
         } = self.cur()
         {
             self.increment();
             let right = self.parse_additive()?;
-            left = Rc::new(AST::And(loc, left, right));
+            left = Rc::new(AST::And(left.span().extend(right.span()), left, right));
         }
         Ok(left)
     }
@@ -364,7 +438,6 @@ impl Parser {
         let mut left = self.parse_multiplicative()?;
         while let Token {
             kind: TokenKind::Plus | TokenKind::Minus,
-            loc,
             ..
         } = self.cur()
         {
@@ -372,8 +445,12 @@ impl Parser {
             self.increment();
             let right = self.parse_multiplicative()?;
             left = match op {
-                TokenKind::Plus => Rc::new(AST::Plus(loc, left, right)),
-                TokenKind::Minus => Rc::new(AST::Minus(loc, left, right)),
+                TokenKind::Plus => {
+                    Rc::new(AST::Plus(left.span().extend(right.span()), left, right))
+                }
+                TokenKind::Minus => {
+                    Rc::new(AST::Minus(left.span().extend(right.span()), left, right))
+                }
                 _ => unreachable!(),
             }
         }
@@ -385,7 +462,6 @@ impl Parser {
 
         while let Token {
             kind: TokenKind::Star | TokenKind::Slash,
-            loc,
             ..
         } = self.cur()
         {
@@ -393,8 +469,12 @@ impl Parser {
             self.increment();
             let right = self.parse_prefix()?;
             left = match op {
-                TokenKind::Star => Rc::new(AST::Multiply(loc, left, right)),
-                TokenKind::Slash => Rc::new(AST::Divide(loc, left, right)),
+                TokenKind::Star => {
+                    Rc::new(AST::Multiply(left.span().extend(right.span()), left, right))
+                }
+                TokenKind::Slash => {
+                    Rc::new(AST::Divide(left.span().extend(right.span()), left, right))
+                }
                 _ => unreachable!(),
             }
         }
@@ -411,10 +491,17 @@ impl Parser {
     fn parse_prefix(&mut self) -> Result<Rc<AST>> {
         match self.cur().kind {
             TokenKind::Not => {
-                let loc = self.cur().loc;
+                let start = self.cur().span;
                 self.increment();
                 let expr = self.parse_prefix()?;
-                Ok(Rc::new(AST::Not(loc, expr)))
+                Ok(Rc::new(AST::Not(start.extend(expr.span()), expr)))
+            }
+            TokenKind::PlusPlus | TokenKind::MinusMinus => {
+                let offset = if self.cur().kind == TokenKind::PlusPlus { 1 } else { -1 };
+                let start = self.cur().span;
+                self.increment();
+                let expr = self.parse_prefix()?;
+                Ok(Rc::new(AST::PreIncrement(start.extend(expr.span()), expr, offset)))
             }
             _ => self.parse_postfix(),
         }
@@ -426,19 +513,20 @@ impl Parser {
             match self.cur() {
                 Token {
                     kind: TokenKind::LeftBracket,
-                    loc,
                     ..
                 } => {
                     self.increment();
+                    let mut span = *val.span();
 
                     let start = self.parse_slice_value()?;
                     if self.cur().kind == TokenKind::RightBracket {
+                        span = span.extend(&self.cur().span);
                         if let Some(start) = start {
                             self.increment();
-                            val = Rc::new(AST::Index(loc.clone(), val, start));
+                            val = Rc::new(AST::Index(span, val, start));
                             continue;
                         } else {
-                            error!(loc, "Cannot have empty index");
+                            error!(span, "Cannot have empty index");
                         }
                     }
 
@@ -446,9 +534,10 @@ impl Parser {
                     let end = self.parse_slice_value()?;
 
                     if self.cur().kind == TokenKind::RightBracket {
+                        span = span.extend(&self.cur().span);
                         self.increment();
                         val = Rc::new(AST::Slice {
-                            loc: loc.clone(),
+                            span,
                             lhs: val,
                             start,
                             end,
@@ -459,9 +548,10 @@ impl Parser {
 
                     self.consume(TokenKind::Colon)?;
                     let step = self.parse_slice_value()?;
+                    span = span.extend(&self.cur().span);
                     self.consume(TokenKind::RightBracket)?;
                     val = Rc::new(AST::Slice {
-                        loc,
+                        span,
                         lhs: val,
                         start,
                         end,
@@ -470,14 +560,15 @@ impl Parser {
                 }
                 Token {
                     kind: TokenKind::LeftParen,
-                    loc,
                     ..
                 } => {
                     self.increment();
                     let mut args = vec![];
+                    let mut span = *val.span();
                     loop {
                         match self.cur().kind {
                             TokenKind::RightParen => {
+                                span = span.extend(&self.cur().span);
                                 self.increment();
                                 break;
                             }
@@ -487,11 +578,11 @@ impl Parser {
                                     TokenKind::Comma => self.increment(),
                                     TokenKind::RightParen => {}
                                     TokenKind::EOF => eof_error!(
-                                        self.cur().loc,
+                                        self.cur().span,
                                         "Expected `)` or ',' but got EOF"
                                     ),
                                     _ => error!(
-                                        self.cur().loc,
+                                        self.cur().span,
                                         "Expected `)` or `,` but got {:?}",
                                         self.cur().kind
                                     ),
@@ -499,16 +590,28 @@ impl Parser {
                             }
                         }
                     }
-                    val = Rc::new(AST::Call(loc, val, args));
+                    val = Rc::new(AST::Call(span, val, args));
                 }
                 Token {
                     kind: TokenKind::DotDot,
-                    loc,
                     ..
                 } => {
                     self.increment();
                     let end = self.parse_atom()?;
-                    val = Rc::new(AST::Range(loc, val, end));
+                    val = Rc::new(AST::Range(val.span().extend(end.span()), val, end));
+                }
+                Token {
+                    kind: TokenKind::PlusPlus | TokenKind::MinusMinus,
+                    span,
+                    ..
+                } => {
+                    let offset = if self.cur().kind == TokenKind::PlusPlus { 1 } else { -1 };
+                    self.increment();
+                    val = Rc::new(AST::PostIncrement(
+                        val.span().extend(&span),
+                        val,
+                        offset,
+                    ));
                 }
                 _ => break,
             }
@@ -528,123 +631,149 @@ impl Parser {
                 Ok(expr)
             }
             Token {
+                kind: TokenKind::LeftBracket,
+                span,
+                ..
+            } => {
+                let mut arr = vec![];
+                self.increment();
+                while self.cur().kind != TokenKind::RightBracket {
+                    arr.push(self.parse_expression()?);
+                    match self.cur().kind {
+                        TokenKind::Comma => self.increment(),
+                        TokenKind::RightBracket => {}
+                        TokenKind::EOF => eof_error!(
+                            self.cur().span,
+                            "Expected `]` or ',' but got EOF"
+                        ),
+                        _ => error!(
+                            self.cur().span,
+                            "Expected `]` or `,` but got {:?}",
+                            self.cur().kind
+                        ),
+                    }
+                }
+                let end = self.consume(TokenKind::RightBracket)?.span;
+                Ok(Rc::new(AST::ArrayLiteral(span.extend(&end), arr)))
+            }
+            Token {
                 kind: TokenKind::Pipe,
                 ..
             } => self.parse_lambda(),
             Token {
                 kind: TokenKind::IntegerLiteralDec,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
                 if let Ok(num) = text.parse::<i64>() {
-                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                    Ok(Rc::new(AST::IntegerLiteral(span, num)))
                 } else {
-                    error!(loc, "Invalid integer literal: {}", text);
+                    error!(span, "Invalid integer literal: {}", text);
                 }
             }
             Token {
                 kind: TokenKind::IntegerLiteralBin,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
                 if let Ok(num) = i64::from_str_radix(&text, 2) {
-                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                    Ok(Rc::new(AST::IntegerLiteral(span, num)))
                 } else {
-                    error!(loc, "Invalid integer literal: {}", text);
+                    error!(span, "Invalid integer literal: {}", text);
                 }
             }
             Token {
                 kind: TokenKind::IntegerLiteralOct,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
                 if let Ok(num) = i64::from_str_radix(&text, 8) {
-                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                    Ok(Rc::new(AST::IntegerLiteral(span, num)))
                 } else {
-                    error!(loc, "Invalid integer literal: {}", text);
+                    error!(span, "Invalid integer literal: {}", text);
                 }
             }
             Token {
                 kind: TokenKind::IntegerLiteralHex,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
                 if let Ok(num) = i64::from_str_radix(&text, 16) {
-                    Ok(Rc::new(AST::IntegerLiteral(loc, num)))
+                    Ok(Rc::new(AST::IntegerLiteral(span, num)))
                 } else {
-                    error!(loc, "Invalid integer literal: {}", text);
+                    error!(span, "Invalid integer literal: {}", text);
                 }
             }
             Token {
                 kind: TokenKind::FloatLiteral,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
                 if let Ok(num) = text.parse::<f64>() {
-                    Ok(Rc::new(AST::FloatLiteral(loc, num)))
+                    Ok(Rc::new(AST::FloatLiteral(span, num)))
                 } else {
-                    error!(loc, "Invalid float literal: {}", text);
+                    error!(span, "Invalid float literal: {}", text);
                 }
             }
             Token {
                 kind: TokenKind::StringLiteral,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
-                Ok(Rc::new(AST::StringLiteral(loc, text)))
+                Ok(Rc::new(AST::StringLiteral(span, text)))
             }
             Token {
                 kind: TokenKind::Identifier,
-                loc,
+                span,
                 text,
                 ..
             } => {
                 self.increment();
-                Ok(Rc::new(AST::Variable(loc, text)))
+                Ok(Rc::new(AST::Variable(span, text)))
             }
             Token {
                 kind: TokenKind::True,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
-                Ok(Rc::new(AST::BooleanLiteral(loc, true)))
+                Ok(Rc::new(AST::BooleanLiteral(span, true)))
             }
             Token {
                 kind: TokenKind::False,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
-                Ok(Rc::new(AST::BooleanLiteral(loc, false)))
+                Ok(Rc::new(AST::BooleanLiteral(span, false)))
             }
             Token {
                 kind: TokenKind::Nothing,
-                loc,
+                span,
                 ..
             } => {
                 self.increment();
-                Ok(Rc::new(AST::Nothing(loc)))
+                Ok(Rc::new(AST::Nothing(span)))
             }
             Token {
                 kind: TokenKind::EOF,
-                loc,
+                span,
                 ..
-            } => eof_error!(loc, "Unexpected EOF in parse_atom"),
+            } => eof_error!(span, "Unexpected EOF in parse_atom"),
             _ => error!(
-                self.cur().loc,
+                self.cur().span,
                 "Unexpected token in parse_atom: {}",
                 self.cur()
             ),

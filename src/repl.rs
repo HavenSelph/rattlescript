@@ -1,9 +1,8 @@
 use crate::ast::AST;
-use crate::error::{Error, Result};
-use crate::interpreter::{Interpreter, Ref, Scope};
-use crate::value::Value;
-use std::cell::RefCell;
-use std::collections::HashMap;
+use crate::common::Ref;
+use crate::error::{Error, Result, ErrorKind};
+use crate::interpreter::value::Value;
+use crate::interpreter::{Interpreter, Scope};
 use std::io::Write;
 use std::rc::Rc;
 
@@ -15,11 +14,7 @@ pub struct Repl {
 impl Repl {
     pub fn new() -> Repl {
         let interpreter = Interpreter::new();
-        let global_scope = Rc::new(RefCell::new(Scope {
-            vars: HashMap::new(),
-            parent: None,
-            in_function: false,
-        }));
+        let global_scope = Scope::new(None, false);
         Repl {
             interpreter,
             global_scope,
@@ -36,19 +31,23 @@ impl Repl {
                 .read_line(&mut temp)
                 .expect("Failed to read line");
             if temp.trim().is_empty() {
-                break self.try_parse(input.clone())?;
+                if input.trim().is_empty() {
+                    return Ok(());
+                }
+                continue;
             }
+
             input.push_str(&temp);
             match self.try_parse(input.clone()) {
                 Ok(ast) => break ast,
-                Err(Error::UnexpectedEOF(..)) => continue,
-                Err(e) => return Err(e),
+                Err(Error{kind: ErrorKind::UnexpectedEOF, ..}) => {}
+                Err(err) => return Err(err),
             }
         };
         let val = self
             .interpreter
-            .run_block_without_scope(&ast, self.global_scope.clone())?;
-        match val {
+            .run_block_without_new_scope(&ast, self.global_scope.clone())?;
+        match &val {
             Value::Nothing => {}
             _ => println!("{}", val.repr()),
         }
@@ -56,19 +55,26 @@ impl Repl {
     }
 
     fn try_parse(&self, input: String) -> Result<Rc<AST>> {
-        let mut lex = crate::lexer::Lexer::new(input, "<repl>".to_string());
+        let mut lex = crate::lexer::Lexer::new(input, "<repl>");
         let tokens = lex.lex()?;
         let mut parser = crate::parser::Parser::new(tokens);
-        let ast = parser.parse()?;
-        Ok(ast)
+        parser.parse()
     }
 
     pub fn run(&mut self) {
         loop {
             match self.run_once() {
                 Ok(_) => {}
-                Err(e) => {
-                    println!("{:?}", e);
+                Err(err) => {
+                    if err.span.0.line == err.span.1.line {
+                        let len = err.span.1.column - err.span.0.column;
+                        if len <= 1 {
+                            println!("   {}\x1b[0;31m▲\x1b[0m", " ".repeat(err.span.0.column));
+                        } else {
+                            println!("   {}\x1b[0;31m└{}┘\x1b[0m", " ".repeat(err.span.0.column), "─".repeat(len - 2));
+                        }
+                    }
+                    println!("\x1b[0;31m{}\x1b[0m", err);
                 }
             }
         }

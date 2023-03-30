@@ -1,5 +1,6 @@
 use crate::error::{lexer_error as error, Result};
-use crate::token::{Location, Token, TokenKind};
+use crate::common::{Location, Span};
+use crate::token::{Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -10,7 +11,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(input: String, filename: String) -> Lexer {
+    pub fn new(input: String, filename: &'static str) -> Lexer {
         Lexer {
             location: Location {
                 line: 1,
@@ -47,18 +48,17 @@ impl Lexer {
         }
     }
 
+    fn loc(&self) -> Location {
+        self.location
+    }
+
     fn push_simple(&mut self, tokens: &mut Vec<Token>, kind: TokenKind, len: usize) {
-        self.push(
-            tokens,
-            Token::new(
-                kind,
-                self.location.clone(),
-                self.input[self.current_index..self.current_index + len].to_string(),
-            ),
-        );
+        let start = self.loc();
+        let text = self.input[self.current_index..self.current_index + len].to_string();
         for _ in 0..len {
             self.increment();
         }
+        self.push(tokens, Token::new(kind, Span(start, self.loc()), text));
     }
 
     fn push(&mut self, tokens: &mut Vec<Token>, mut token: Token) {
@@ -70,6 +70,7 @@ impl Lexer {
     pub fn lex(&mut self) -> Result<Vec<Token>> {
         let mut tokens: Vec<Token> = vec![];
         while let Some(c) = self.cur() {
+            let start = self.loc();
             match c {
                 c if c.is_whitespace() => self.increment(),
 
@@ -78,49 +79,61 @@ impl Lexer {
                     let mut num = String::new();
 
                     let base = match self.peek(1) {
-                        Some('b') => Base::Binary,
-                        Some('o') => Base::Octal,
-                        Some('x') => Base::Hexadecimal,
-                        _ => Base::Decimal,
+                        Some('b') => Base::Bin,
+                        Some('o') => Base::Oct,
+                        Some('x') => Base::Hex,
+                        _ => Base::Dec,
                     };
 
                     self.increment();
                     self.increment();
 
-                    self.lex_num(&mut num, base)?;
+                    self.lex_num(&mut num, base, &start)?;
                     self.push(
                         &mut tokens,
-                        Token::new(base.into(), self.location.clone(), num),
+                        Token::new(base.into(), Span(start, self.loc()), num),
                     );
                 }
 
                 // decimal int/float literals
                 '0'..='9' => {
-                    let loc = self.location.clone();
                     let mut num = String::new();
 
-                    self.lex_num(&mut num, Base::Decimal)?;
+                    self.lex_num(&mut num, Base::Dec, &start)?;
                     if let Some('.') = self.cur() {
                         if let Some('.') = self.peek(1) {
                             self.push(
                                 &mut tokens,
-                                Token::new(TokenKind::IntegerLiteralDec, loc.clone(), num),
+                                Token::new(
+                                    TokenKind::IntegerLiteralDec,
+                                    Span(start, self.loc()),
+                                    num,
+                                ),
                             );
                         } else {
                             num.push('.');
                             self.increment();
-                            self.lex_num(&mut num, Base::Decimal)?;
-                            self.push(&mut tokens, Token::new(TokenKind::FloatLiteral, loc, num));
+                            self.lex_num(&mut num, Base::Dec, &start)?;
+                            self.push(
+                                &mut tokens,
+                                Token::new(TokenKind::FloatLiteral, Span(start, self.loc()), num),
+                            );
                         }
                     } else {
                         self.push(
                             &mut tokens,
-                            Token::new(TokenKind::IntegerLiteralDec, loc, num),
+                            Token::new(TokenKind::IntegerLiteralDec, Span(start, self.loc()), num),
                         );
                     }
                 }
-                '+' => self.push_simple(&mut tokens, TokenKind::Plus, 1),
-                '-' => self.push_simple(&mut tokens, TokenKind::Minus, 1),
+                '+' => match self.peek(1) {
+                    Some('+') => self.push_simple(&mut tokens, TokenKind::PlusPlus, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::Plus, 1),
+                },
+                '-' => match self.peek(1) {
+                    Some('-') => self.push_simple(&mut tokens, TokenKind::MinusMinus, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::Minus, 1),
+                },
                 '*' => self.push_simple(&mut tokens, TokenKind::Star, 1),
                 '/' => match self.peek(1) {
                     Some('/') => {
@@ -145,11 +158,11 @@ impl Lexer {
                     _ => self.push_simple(&mut tokens, TokenKind::Equals, 1),
                 },
                 '<' => match self.peek(1) {
-                    Some('=') => self.push_simple(&mut tokens, TokenKind::LessThanEquals, 2),
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::LessEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::LessThan, 1),
                 },
                 '>' => match self.peek(1) {
-                    Some('=') => self.push_simple(&mut tokens, TokenKind::GreaterThanEquals, 2),
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::GreaterEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::GreaterThan, 1),
                 },
                 '!' => match self.peek(1) {
@@ -172,7 +185,6 @@ impl Lexer {
 
                 // identifiers
                 'a'..='z' | 'A'..='Z' | '_' => {
-                    let loc = self.location.clone();
                     let mut ident = String::new();
                     while let Some(c) = self.cur() {
                         match c {
@@ -183,9 +195,9 @@ impl Lexer {
                             _ => break,
                         }
                     }
-                    self.push(&mut tokens, Token::from_str(ident, loc));
+                    self.push(&mut tokens, Token::from_str(ident, Span(start, self.loc())));
                 }
-                _ => error!(self.location, "Unexpected character {}", c),
+                _ => error!(Span(start, self.loc()), "Unexpected character {}", c),
             }
         }
         self.push_simple(&mut tokens, TokenKind::EOF, 0);
@@ -193,41 +205,42 @@ impl Lexer {
     }
 
     fn lex_string_literal(&mut self) -> Result<Token> {
-        let loc = self.location.clone();
+        let start = self.loc();
         let mut string = String::new();
         self.increment();
         while let Some(c) = self.cur() {
             match c {
                 '"' => {
                     self.increment();
-                    break;
+                    return Ok(Token::new(
+                        TokenKind::StringLiteral,
+                        Span(start, self.loc()),
+                        string,
+                    ));
                 }
-                '\n' => {
-                    panic!("{loc} Unexpected newline in string literal");
-                }
+                '\n' => break,
                 _ => {
                     string.push(c);
                     self.increment();
                 }
             }
         }
-        Ok(Token::new(TokenKind::StringLiteral, loc, string))
+        error!(Span(start, self.loc()), "Unterminated string literal");
     }
 
-    fn lex_num(&mut self, num: &mut String, base: Base) -> Result<()> {
+    fn lex_num(&mut self, num: &mut String, base: Base, start: &Location) -> Result<()> {
         while let Some(mut c) = self.cur() {
             c = c.to_ascii_lowercase();
             match (base, c) {
-                (Base::Binary, '0'..='1')
-                | (Base::Octal, '0'..='7')
-                | (Base::Decimal, '0'..='9')
-                | (Base::Hexadecimal, '0'..='9' | 'a'..='f') => {
+                (Base::Bin, '0'..='1')
+                | (Base::Oct, '0'..='7')
+                | (Base::Dec, '0'..='9')
+                | (Base::Hex, '0'..='9' | 'a'..='f') => {
                     num.push(c);
                     self.increment();
                 }
                 (_, '0'..='9' | 'a'..='f') => {
-                    num.push(c);  // push the invalid character for the error message
-                    error!(self.location, "Invalid {:?} numerical literal '{}'", base, num);
+                    error!(Span(*start, self.loc()), "Invalid numerical literal");
                 }
                 (_, '_') => self.increment(),
                 _ => break,
@@ -239,19 +252,19 @@ impl Lexer {
 
 #[derive(Debug, Clone, Copy)]
 enum Base {
-    Binary,
-    Octal,
-    Decimal,
-    Hexadecimal,
+    Bin,
+    Oct,
+    Dec,
+    Hex,
 }
 
 impl From<Base> for TokenKind {
     fn from(value: Base) -> Self {
         match value {
-            Base::Binary => Self::IntegerLiteralBin,
-            Base::Octal => Self::IntegerLiteralOct,
-            Base::Decimal => Self::IntegerLiteralDec,
-            Base::Hexadecimal => Self::IntegerLiteralHex,
+            Base::Bin => Self::IntegerLiteralBin,
+            Base::Oct => Self::IntegerLiteralOct,
+            Base::Dec => Self::IntegerLiteralDec,
+            Base::Hex => Self::IntegerLiteralHex,
         }
     }
 }
