@@ -128,18 +128,18 @@ impl Lexer {
                 }
                 '+' => match self.peek(1) {
                     Some('+') => self.push_simple(&mut tokens, TokenKind::PlusPlus, 2),
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::PlusEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Plus, 1),
                 },
                 '-' => match self.peek(1) {
                     Some('-') => self.push_simple(&mut tokens, TokenKind::MinusMinus, 2),
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::MinusEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Minus, 1),
                 },
-                '*' => {
-                    if self.peek(1) == Some('*') {
-                        self.push_simple(&mut tokens, TokenKind::StarStar, 2);
-                    } else {
-                        self.push_simple(&mut tokens, TokenKind::Star, 1);
-                    }
+                '*' => match self.peek(1) {
+                    Some('*') => self.push_simple(&mut tokens, TokenKind::StarStar, 2),
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::StarEquals, 2),
+                    _ => self.push_simple(&mut tokens, TokenKind::Star, 1),
                 }
                 '/' => match self.peek(1) {
                     Some('/') => {
@@ -150,6 +150,7 @@ impl Lexer {
                             }
                         }
                     }
+                    Some('=') => self.push_simple(&mut tokens, TokenKind::SlashEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Slash, 1),
                 },
                 '(' => self.push_simple(&mut tokens, TokenKind::LeftParen, 1),

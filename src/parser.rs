@@ -375,6 +375,70 @@ impl Parser {
                     right,
                 )))
             }
+            Token {
+                kind: TokenKind::PlusEquals,
+                ..
+            } => {
+                self.increment();
+                let right = self.parse_comparison()?;
+                Ok(Rc::new(AST::Assignment(
+                    left.span().extend(right.span()),
+                    left.clone(),
+                    Rc::new(AST::Plus(
+                        left.span().extend(right.span()),
+                        left,
+                        right,
+                    )),
+                )))
+            }
+            Token {
+                kind: TokenKind::MinusEquals,
+                ..
+            } => {
+                self.increment();
+                let right = self.parse_comparison()?;
+                Ok(Rc::new(AST::Assignment(
+                    left.span().extend(right.span()),
+                    left.clone(),
+                    Rc::new(AST::Minus(
+                        left.span().extend(right.span()),
+                        left,
+                        right,
+                    )),
+                )))
+            }
+            Token {
+                kind: TokenKind::StarEquals,
+                ..
+            } => {
+                self.increment();
+                let right = self.parse_comparison()?;
+                Ok(Rc::new(AST::Assignment(
+                    left.span().extend(right.span()),
+                    left.clone(),
+                    Rc::new(AST::Multiply(
+                        left.span().extend(right.span()),
+                        left,
+                        right,
+                    )),
+                )))
+            }
+            Token {
+                kind: TokenKind::SlashEquals,
+                ..
+            } => {
+                self.increment();
+                let right = self.parse_comparison()?;
+                Ok(Rc::new(AST::Assignment(
+                    left.span().extend(right.span()),
+                    left.clone(),
+                    Rc::new(AST::Divide(
+                        left.span().extend(right.span()),
+                        left,
+                        right,
+                    )),
+                )))
+            }
             _ => Ok(left),
         }
     }

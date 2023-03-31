@@ -109,3 +109,7 @@ def adder2(a, b=default) {
 print(adder2(1))
 print(adder2(1,3))
 print(adder2(a:1, b:3))
+
+let num = 0
+num += 10
+print(num)
