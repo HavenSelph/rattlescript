@@ -1,17 +1,26 @@
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::Value;
-use crate::common::Span;
+use crate::common::{Span, make};
 
 pub fn print(_span: &Span, args: Vec<Value>) -> Result<Value> {
     for (i, arg) in args.iter().enumerate() {
         if i != 0 {
             print!(" ");
         }
-        print!("{}", arg.repr())
+        print!("{:?}", arg)
     }
     println!();
     Ok(Value::Nothing)
 }
+
+
+pub fn repr(span: &Span, args: Vec<Value>) -> Result<Value> {
+    if args.len() != 1 {
+        error!(span, "repr() takes exactly one argument");
+    }
+    Ok(Value::String(make!(args[0].repr())))
+}
+
 
 pub fn len(span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {

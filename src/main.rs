@@ -11,6 +11,7 @@ mod common;
 mod repl;
 mod token;
 
+
 fn run_file(filename: &str) -> Result<()> {
     let content = std::fs::read_to_string(filename).expect("Couldn't open input file");
 

@@ -327,9 +327,9 @@ impl Parser {
                 Ok(Rc::new(AST::Assert(span, cond)))
             }
             _ => {
-                let expr = self.parse_expression();
+                let expr = self.parse_expression()?;
                 self.consume_line_end()?;
-                expr
+                Ok(expr)
             }
         }
     }
@@ -735,6 +735,15 @@ impl Parser {
                 Ok(Rc::new(AST::StringLiteral(span, text)))
             }
             Token {
+                kind: TokenKind::FormatStringLiteral,
+                span,
+                text,
+                ..
+            } => {
+                self.increment();
+                self.parse_format_string(span, text)
+            }
+            Token {
                 kind: TokenKind::Identifier,
                 span,
                 text,
@@ -778,5 +787,45 @@ impl Parser {
                 self.cur()
             ),
         }
+    }
+
+    fn parse_format_string(&mut self, span: crate::common::Span, text: String) -> Result<Rc<AST>> {
+        let mut parts = vec![];
+        let mut buf = String::new();
+        let mut start_index = 1;
+        for (i, c) in text.chars().enumerate() {
+            match c {
+                '{' | '}' => {
+                    parts.push((start_index, buf));
+                    buf = String::new();
+                    start_index = i + 2;
+                }
+                _ => {
+                    buf.push(c);
+                }
+            }
+        }
+        parts.push((start_index, buf));
+        let mut strings = vec![];
+        let mut exprs: Vec<Rc<AST>> = vec![];
+        for (index, (start_index, item)) in parts.iter().enumerate() {
+            if index % 2 == 0 {
+                strings.push(item.clone());
+            } else {
+                let mut lexer = crate::lexer::Lexer::new(item.clone(), span.0.filename);
+                let mut location = span.0;
+                location.column += start_index;
+                lexer.location = location;
+                let tokens = lexer.lex()?;
+                let mut parser = Parser::new(tokens.clone());
+                let expr = parser.parse_expression()?;
+                match parser.consume(TokenKind::EOF) {
+                    Ok(_) => {}
+                    Err(e) => error!(e.span, "Invalid expression in format string"),
+                }
+                exprs.push(expr);
+            }
+        }
+        Ok(Rc::new(AST::FormatStringLiteral(span, strings, exprs)))
     }
 }

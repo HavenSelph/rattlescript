@@ -4,7 +4,7 @@ use crate::token::{Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer {
-    location: Location,
+    pub location: Location,
     input: String,
     current_index: usize,
     seen_newline: bool,
@@ -174,7 +174,7 @@ impl Lexer {
                 '{' => self.push_simple(&mut tokens, TokenKind::LeftBrace, 1),
                 '}' => self.push_simple(&mut tokens, TokenKind::RightBrace, 1),
                 '@' => self.push_simple(&mut tokens, TokenKind::At, 1),
-                '"' => {
+                '"' | '`' => {
                     let token = self.lex_string_literal()?;
                     self.push(&mut tokens, token);
                 }
@@ -207,13 +207,18 @@ impl Lexer {
     fn lex_string_literal(&mut self) -> Result<Token> {
         let start = self.loc();
         let mut string = String::new();
+        let quote = self.cur().unwrap();
         self.increment();
         while let Some(c) = self.cur() {
             match c {
-                '"' => {
+                c if c==quote => {
                     self.increment();
                     return Ok(Token::new(
-                        TokenKind::StringLiteral,
+                        if quote == '"' {
+                            TokenKind::StringLiteral
+                        } else {
+                            TokenKind::FormatStringLiteral
+                        },
                         Span(start, self.loc()),
                         string,
                     ));

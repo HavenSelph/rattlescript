@@ -76,7 +76,7 @@ macro_rules! builtins {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let builtins = builtins!(print, len, exit);
+        let builtins = builtins!(print, repr, len, exit);
         Self {
             builtins,
             control_flow: ControlFlow::None,
@@ -350,7 +350,17 @@ impl Interpreter {
                 }
                 Value::Nothing
             }
-
+            AST::FormatStringLiteral(span, strings, exprs) => {
+                let mut result = String::new();
+                for (i, string) in strings.iter().enumerate() {
+                    result.push_str(string);
+                    if i < exprs.len() {
+                        let expr = self.run(&exprs[i], scope.clone())?;
+                        result.push_str(format!("{:?}", expr).as_str());
+                    }
+                }
+                Value::String(make!(result))
+            }
             AST::Range(span, start, end) => {
                 let start = self.run(start, scope.clone())?;
                 let end = self.run(end, scope)?;

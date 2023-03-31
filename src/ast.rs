@@ -54,6 +54,7 @@ pub enum AST {
         step: Option<Rc<AST>>,
         body: Rc<AST>,
     },
+    FormatStringLiteral(Span, Vec<String>, Vec<Rc<AST>>),
     Range(Span, Rc<AST>, Rc<AST>),
 
     PostIncrement(Span, Rc<AST>, i64),
@@ -98,6 +99,7 @@ impl AST {
             AST::Break(span, ..) => span,
             AST::ForEach(span, ..) => span,
             AST::For { span, .. } => span,
+            AST::FormatStringLiteral(span, ..) => span,
             AST::Range(span, ..) => span,
             AST::PostIncrement(span, ..) => span,
             AST::PreIncrement(span, ..) => span,
@@ -189,6 +191,16 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, ")")
             },
+            AST::FormatStringLiteral(_, strings, exprs) => {
+                write!(f, "\"")?;
+                for (i, string) in strings.iter().enumerate() {
+                    write!(f, "{}", string)?;
+                    if i < exprs.len() {
+                        write!(f, "{{{}}}", exprs[i])?;
+                    }
+                }
+                write!(f, "\"")
+            }
             AST::Range(_, start, end) => write!(f, "{}..{}", start, end),
             AST::PostIncrement(_, expr, offset) => write!(f, "{}{}", expr, if *offset == 1 { "++" } else { "--" }),
             AST::PreIncrement(_, expr, offset) => write!(f, "{}{}", if *offset == 1 { "++" } else { "--" }, expr),

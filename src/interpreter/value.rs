@@ -110,7 +110,7 @@ impl std::fmt::Debug for Value {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{:?}", item)?;
+                    write!(f, "{}", item.repr())?;
                 }
                 write!(f, "]")
             }

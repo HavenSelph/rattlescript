@@ -82,6 +82,7 @@ print("-"*80)
 for x in 0..5 {
     print(x)
 }
+print("repr of this")
 
 //print("hello world
 
@@ -89,3 +90,8 @@ let c = 100_000.25_18
 print(c)
 
 print(0b_101, 0o_67, 0x_22B, 0x_15b3)
+let list = [1, 2, 3, 4]
+print(list)
+list[2] = "Hello"
+print(list)
+assert 10 == 10, "failed"
