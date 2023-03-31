@@ -129,6 +129,7 @@ impl Interpreter {
             AST::Plus(span, left, right) => dispatch_op!(span, Value::plus, left, right),
             AST::Minus(span, left, right) => dispatch_op!(span, Value::minus, left, right),
             AST::Multiply(loc, left, right) => dispatch_op!(loc, Value::multiply, left, right),
+            AST::Power(loc, left, right) => dispatch_op!(loc, Value::power, left, right),
             AST::Divide(loc, left, right) => dispatch_op!(loc, Value::divide, left, right),
 
             AST::Not(loc, expr) => dispatch_op!(loc, Value::not, expr),

@@ -55,6 +55,7 @@ pub enum TokenKind {
     SemiColon,
     Slash,
     Star,
+    StarStar,
     StringLiteral,
     True,
     While,

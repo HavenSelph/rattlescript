@@ -134,7 +134,13 @@ impl Lexer {
                     Some('-') => self.push_simple(&mut tokens, TokenKind::MinusMinus, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Minus, 1),
                 },
-                '*' => self.push_simple(&mut tokens, TokenKind::Star, 1),
+                '*' => {
+                    if self.peek(1) == Some('*') {
+                        self.push_simple(&mut tokens, TokenKind::StarStar, 2);
+                    } else {
+                        self.push_simple(&mut tokens, TokenKind::Star, 1);
+                    }
+                },
                 '/' => match self.peek(1) {
                     Some('/') => {
                         while let Some(c) = self.cur() {
