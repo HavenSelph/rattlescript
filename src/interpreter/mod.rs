@@ -350,7 +350,7 @@ impl Interpreter {
                 }
                 Value::Nothing
             }
-            AST::FormatStringLiteral(span, strings, exprs) => {
+            AST::FormatStringLiteral(_, strings, exprs) => {
                 let mut result = String::new();
                 for (i, string) in strings.iter().enumerate() {
                     result.push_str(string);

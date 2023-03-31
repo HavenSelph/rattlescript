@@ -77,16 +77,16 @@ pub struct Function {
 
 #[derive(Clone)]
 pub enum Value {
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
-    String(Ref<String>),
-    BuiltInFunction(Ref<String>),
-    Function(Ref<Function>),
-    Iterator(IteratorValue),
-    Range(i64, i64),
     Array(Ref<Vec<Value>>),
+    Boolean(bool),
+    BuiltInFunction(Ref<String>),
+    Float(f64),
+    Function(Ref<Function>),
+    Integer(i64),
+    Iterator(IteratorValue),
     Nothing,
+    Range(i64, i64),
+    String(Ref<String>),
 }
 
 impl std::fmt::Debug for Value {
