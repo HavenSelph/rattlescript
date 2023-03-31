@@ -183,7 +183,9 @@ impl std::fmt::Display for AST {
             AST::Continue(_) => write!(f, "continue"),
             AST::Break(_) => write!(f, "break"),
             AST::ForEach(_, name, iter, ..) => write!(f, "for {} in {}", name, iter),
-            AST::For{init, cond, step, .. } => {
+            AST::For {
+                init, cond, step, ..
+            } => {
                 write!(f, "for (")?;
                 if let Some(init) = init {
                     write!(f, "{}", init)?;
@@ -197,12 +199,10 @@ impl std::fmt::Display for AST {
                     write!(f, "{}", step)?;
                 }
                 write!(f, ")")
-            },
-            AST::Comprehension(_, var, iter, expr, cond) => {
-                match cond {
-                    Some(cond) => write!(f, "[{} for {} in {} if {}]", expr, var, iter, cond),
-                    None => write!(f, "[{} for {} in {}]", expr, var, iter),
-                }
+            }
+            AST::Comprehension(_, var, iter, expr, cond) => match cond {
+                Some(cond) => write!(f, "[{} for {} in {} if {}]", expr, var, iter, cond),
+                None => write!(f, "[{} for {} in {}]", expr, var, iter),
             },
             AST::FormatStringLiteral(_, strings, exprs) => {
                 write!(f, "\"")?;
