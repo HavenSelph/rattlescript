@@ -1,6 +1,6 @@
 use crate::ast::AST;
-use crate::common::{Ref, get, make, Span};
-use crate::error::{Result, runtime_error as error};
+use crate::common::{get, make, Ref, Span};
+use crate::error::{runtime_error as error, Result};
 use crate::interpreter::Scope;
 use std::rc::Rc;
 
@@ -147,7 +147,7 @@ impl std::cmp::PartialEq for Value {
                 } else {
                     left.iter().zip(right.iter()).all(|(a, b)| a == b)
                 }
-            },
+            }
             _ => false,
         }
     }
@@ -195,10 +195,14 @@ impl Value {
 
     pub fn power(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
-            (Value::Integer(left), Value::Integer(right)) => Value::Integer(left.pow(*right as u32)),
-            (Value::Integer(left), Value::Float(right)) => Value::Float(f64::powf(*left as f64, *right)),
-            (Value::Float(left), Value::Float(right)) => Value::Float(left.powf(*right)),
+            (Value::Integer(left), Value::Integer(right)) => {
+                Value::Integer(left.pow(*right as u32))
+            }
+            (Value::Integer(left), Value::Float(right)) => {
+                Value::Float(f64::powf(*left as f64, *right))
+            }
             (Value::Float(left), Value::Integer(right)) => Value::Float(left.powf(*right as f64)),
+            (Value::Float(left), Value::Float(right)) => Value::Float(left.powf(*right)),
             _ => error!(span, "Invalid types for exponentiation"),
         })
     }
@@ -220,11 +224,16 @@ impl Value {
         step: Option<Value>,
         span: &Span,
     ) -> Result<Value> {
-
         let start = start.unwrap_or_else(|| Value::Integer(0));
         let step = step.unwrap_or_else(|| Value::Integer(1));
 
-        fn get_slice_params(span: &Span, a: Value, b: Option<Value>, c: Value, default_b: i64) -> Result<(i64, i64, i64)> {
+        fn get_slice_params(
+            span: &Span,
+            a: Value,
+            b: Option<Value>,
+            c: Value,
+            default_b: i64,
+        ) -> Result<(i64, i64, i64)> {
             match (a, b, c) {
                 (Value::Integer(a), None, Value::Integer(c)) => Ok((a, default_b, c)),
                 (Value::Integer(a), Some(Value::Integer(b)), Value::Integer(c)) => Ok((a, b, c)),
@@ -319,7 +328,9 @@ impl Value {
         Ok(match self {
             Value::String(s) => Value::Iterator(IteratorValue::for_string(s.clone())),
             Value::Range(start, end) => Value::Iterator(IteratorValue::for_range(start, end)),
-            Value::Array(arr) | Value::Tuple(arr) => Value::Iterator(IteratorValue::for_array(arr.clone())),
+            Value::Array(arr) | Value::Tuple(arr) => {
+                Value::Iterator(IteratorValue::for_array(arr.clone()))
+            }
             _ => error!(span, "Cannot iterate over this type"),
         })
     }
@@ -384,18 +395,14 @@ impl Value {
                     None => error!(span, "Index out of bounds"),
                 }
             }
-            (Value::Array(arr), Value::Integer(index)) => {
-                match arr.borrow().get(*index as usize) {
-                    Some(v) => v.clone(),
-                    None => error!(span, "Index out of bounds"),
-                }
-            }
-            (Value::Tuple(tup), Value::Integer(index)) => {
-                match tup.borrow().get(*index as usize) {
-                    Some(v) => v.clone(),
-                    None => error!(span, "Index out of bounds"),
-                }
-            }
+            (Value::Array(arr), Value::Integer(index)) => match arr.borrow().get(*index as usize) {
+                Some(v) => v.clone(),
+                None => error!(span, "Index out of bounds"),
+            },
+            (Value::Tuple(tup), Value::Integer(index)) => match tup.borrow().get(*index as usize) {
+                Some(v) => v.clone(),
+                None => error!(span, "Index out of bounds"),
+            },
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
     }
@@ -405,7 +412,7 @@ impl Value {
             (Value::Tuple(_), _) => error!(span, "Can't set index on tuple"),
             (Value::Array(arr), Value::Integer(index)) => {
                 let mut arr = arr.borrow_mut();
-                 match arr.get_mut(*index as usize) {
+                match arr.get_mut(*index as usize) {
                     Some(v) => {
                         *v = value.clone();
                     }

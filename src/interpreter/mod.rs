@@ -1,7 +1,7 @@
 use crate::ast::AST;
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::{IteratorValue, Value, Function};
+use crate::interpreter::value::{Function, IteratorValue, Value};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -417,7 +417,7 @@ impl Interpreter {
                 let left = self.run(left, scope.clone())?;
                 let right = self.run(right, scope)?;
                 left.index(&right, span)?
-            },
+            }
 
             AST::PostIncrement(span, expr, offset) => {
                 let value = self.run(expr, scope.clone())?;
@@ -429,7 +429,7 @@ impl Interpreter {
                     _ => error!(span, "Operation only supported for integers"),
                 }
                 value
-            },
+            }
             AST::PreIncrement(span, expr, offset) => {
                 let value = self.run(expr, scope.clone())?;
                 match &value {
@@ -440,23 +440,17 @@ impl Interpreter {
                     }
                     _ => error!(span, "Operation only supported for integers"),
                 }
-            },
-
-            AST::ArrayLiteral(_, arr) => {
-                Value::Array(make!(
-                    arr.iter()
-                        .map(|x| self.run(x, scope.clone()))
-                        .collect::<Result<Vec<_>>>()?
-                ))
             }
 
-            AST::TupleLiteral(_, arr) => {
-                Value::Tuple(make!(
-                    arr.iter()
-                        .map(|x| self.run(x, scope.clone()))
-                        .collect::<Result<Vec<_>>>()?
-                ))
-            }
+            AST::ArrayLiteral(_, arr) => Value::Array(make!(arr
+                .iter()
+                .map(|x| self.run(x, scope.clone()))
+                .collect::<Result<Vec<_>>>()?)),
+
+            AST::TupleLiteral(_, arr) => Value::Tuple(make!(arr
+                .iter()
+                .map(|x| self.run(x, scope.clone()))
+                .collect::<Result<Vec<_>>>()?)),
         })
     }
 

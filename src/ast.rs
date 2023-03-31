@@ -215,8 +215,12 @@ impl std::fmt::Display for AST {
                 write!(f, "\"")
             }
             AST::Range(_, start, end) => write!(f, "{}..{}", start, end),
-            AST::PostIncrement(_, expr, offset) => write!(f, "{}{}", expr, if *offset == 1 { "++" } else { "--" }),
-            AST::PreIncrement(_, expr, offset) => write!(f, "{}{}", if *offset == 1 { "++" } else { "--" }, expr),
+            AST::PostIncrement(_, expr, offset) => {
+                write!(f, "{}{}", expr, if *offset == 1 { "++" } else { "--" })
+            }
+            AST::PreIncrement(_, expr, offset) => {
+                write!(f, "{}{}", if *offset == 1 { "++" } else { "--" }, expr)
+            }
             AST::ArrayLiteral(_, exprs) => {
                 write!(f, "[")?;
                 for (i, expr) in exprs.iter().enumerate() {

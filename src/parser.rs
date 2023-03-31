@@ -522,11 +522,19 @@ impl Parser {
                 Ok(Rc::new(AST::Not(start.extend(expr.span()), expr)))
             }
             TokenKind::PlusPlus | TokenKind::MinusMinus => {
-                let offset = if self.cur().kind == TokenKind::PlusPlus { 1 } else { -1 };
+                let offset = if self.cur().kind == TokenKind::PlusPlus {
+                    1
+                } else {
+                    -1
+                };
                 let start = self.cur().span;
                 self.increment();
                 let expr = self.parse_prefix()?;
-                Ok(Rc::new(AST::PreIncrement(start.extend(expr.span()), expr, offset)))
+                Ok(Rc::new(AST::PreIncrement(
+                    start.extend(expr.span()),
+                    expr,
+                    offset,
+                )))
             }
             _ => self.parse_postfix(),
         }
@@ -685,7 +693,7 @@ impl Parser {
                 self.consume(TokenKind::RightParen)?;
                 match exprs.len() {
                     1 if !tup => Ok(exprs.pop().unwrap()),
-                    _ => Ok(Rc::new(AST::TupleLiteral(span.extend(&end), exprs)))
+                    _ => Ok(Rc::new(AST::TupleLiteral(span.extend(&end), exprs))),
                 }
             }
             Token {
@@ -705,10 +713,9 @@ impl Parser {
                     match self.cur().kind {
                         TokenKind::Comma => self.increment(),
                         TokenKind::RightBracket => {}
-                        TokenKind::EOF => eof_error!(
-                            self.cur().span,
-                            "Expected `]` or ',' but got EOF"
-                        ),
+                        TokenKind::EOF => {
+                            eof_error!(self.cur().span, "Expected `]` or ',' but got EOF")
+                        }
                         _ => error!(
                             self.cur().span,
                             "Expected `]` or `,` but got {:?}",
@@ -728,7 +735,13 @@ impl Parser {
                         None
                     };
                     let end = self.consume(TokenKind::RightBracket)?.span;
-                    Ok(Rc::new(AST::Comprehension(span.extend(&end), var.text.clone(), iter, arr.pop().unwrap(), cond)))
+                    Ok(Rc::new(AST::Comprehension(
+                        span.extend(&end),
+                        var.text.clone(),
+                        iter,
+                        arr.pop().unwrap(),
+                        cond,
+                    )))
                 } else {
                     let end = self.consume(TokenKind::RightBracket)?.span;
                     Ok(Rc::new(AST::ArrayLiteral(span.extend(&end), arr)))

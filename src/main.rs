@@ -3,14 +3,13 @@
 use crate::error::Result;
 
 mod ast;
+mod common;
 mod error;
 mod interpreter;
 mod lexer;
 mod parser;
-mod common;
 mod repl;
 mod token;
-
 
 fn run_file(filename: &str) -> Result<()> {
     let content = std::fs::read_to_string(filename).expect("Couldn't open input file");

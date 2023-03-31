@@ -72,7 +72,6 @@ macro_rules! runtime_error {
 }
 pub(crate) use runtime_error;
 
-
 impl Error {
     pub fn print_with_source(&self) {
         let msg = &self.message;
@@ -97,9 +96,13 @@ impl Error {
         };
         let max_line = lines.len().min(end.line + context);
 
-        println!("╭────────────────────────────────────────────────────────────────────────────────");
+        println!(
+            "╭────────────────────────────────────────────────────────────────────────────────"
+        );
         println!("│ {}: Error: {}", start, msg);
-        println!("├─────┬──────────────────────────────────────────────────────────────────────────");
+        println!(
+            "├─────┬──────────────────────────────────────────────────────────────────────────"
+        );
         #[allow(clippy::needless_range_loop)]
         for line_no in min_line..max_line {
             let line = lines[line_no];
@@ -118,13 +121,23 @@ impl Error {
                 let text_before = &line[..highlight_start];
                 let text_highlight = &line[highlight_start..highlight_end];
                 let text_after = &line[highlight_end..];
-                println!("│ {:>3} │ {}\x1b[0;31m{}\x1b[0m{}", line_no, text_before, text_highlight, text_after);
+                println!(
+                    "│ {:>3} │ {}\x1b[0;31m{}\x1b[0m{}",
+                    line_no, text_before, text_highlight, text_after
+                );
 
                 if start.line == end.line {
                     if text_highlight.len() <= 1 {
-                        println!("│     │ {}\x1b[0;31m▲\x1b[0m", " ".repeat(text_before.len()));
+                        println!(
+                            "│     │ {}\x1b[0;31m▲\x1b[0m",
+                            " ".repeat(text_before.len())
+                        );
                     } else {
-                        println!("│     │ {}\x1b[0;31m└{}┘\x1b[0m", " ".repeat(text_before.len()), "─".repeat(text_highlight.len()-2));
+                        println!(
+                            "│     │ {}\x1b[0;31m└{}┘\x1b[0m",
+                            " ".repeat(text_before.len()),
+                            "─".repeat(text_highlight.len() - 2)
+                        );
                     }
                 }
             } else {
@@ -132,6 +145,8 @@ impl Error {
             }
         }
 
-        println!("╰─────┴──────────────────────────────────────────────────────────────────────────");
+        println!(
+            "╰─────┴──────────────────────────────────────────────────────────────────────────"
+        );
     }
 }

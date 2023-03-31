@@ -1,4 +1,3 @@
-
 use crate::common::Span;
 
 #[allow(clippy::upper_case_acronyms)]

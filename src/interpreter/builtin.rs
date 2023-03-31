@@ -1,6 +1,6 @@
+use crate::common::{make, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::Value;
-use crate::common::{Span, make};
 
 pub fn print(_span: &Span, args: Vec<Value>) -> Result<Value> {
     for (i, arg) in args.iter().enumerate() {
@@ -13,14 +13,12 @@ pub fn print(_span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Nothing)
 }
 
-
 pub fn repr(span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "repr() takes exactly one argument");
     }
     Ok(Value::String(make!(args[0].repr())))
 }
-
 
 pub fn len(span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
@@ -40,7 +38,7 @@ pub fn exit(span: &Span, args: Vec<Value>) -> Result<Value> {
         Some(val) => match val {
             Value::Integer(i) => *i,
             _ => error!(span, "exit() may only take an integer as argument"),
-        }
+        },
         None => 0,
     };
 

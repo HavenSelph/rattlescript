@@ -1,6 +1,6 @@
 use crate::ast::AST;
 use crate::common::Ref;
-use crate::error::{Error, Result, ErrorKind};
+use crate::error::{Error, ErrorKind, Result};
 use crate::interpreter::value::Value;
 use crate::interpreter::{Interpreter, Scope};
 use std::io::Write;
@@ -40,7 +40,10 @@ impl Repl {
             input.push_str(&temp);
             match self.try_parse(input.clone()) {
                 Ok(ast) => break ast,
-                Err(Error{kind: ErrorKind::UnexpectedEOF, ..}) => {}
+                Err(Error {
+                    kind: ErrorKind::UnexpectedEOF,
+                    ..
+                }) => {}
                 Err(err) => return Err(err),
             }
         };
@@ -71,7 +74,11 @@ impl Repl {
                         if len <= 1 {
                             println!("   {}\x1b[0;31m▲\x1b[0m", " ".repeat(err.span.0.column));
                         } else {
-                            println!("   {}\x1b[0;31m└{}┘\x1b[0m", " ".repeat(err.span.0.column), "─".repeat(len - 2));
+                            println!(
+                                "   {}\x1b[0;31m└{}┘\x1b[0m",
+                                " ".repeat(err.span.0.column),
+                                "─".repeat(len - 2)
+                            );
                         }
                     }
                     println!("\x1b[0;31m{}\x1b[0m", err);

@@ -51,7 +51,6 @@ impl std::fmt::Debug for Span {
     }
 }
 
-
 impl Span {
     pub fn extend(&self, other: &Span) -> Span {
         Span(self.0, other.1)

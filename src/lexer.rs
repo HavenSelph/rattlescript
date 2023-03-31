@@ -1,5 +1,5 @@
-use crate::error::{lexer_error as error, Result};
 use crate::common::{Location, Span};
+use crate::error::{lexer_error as error, Result};
 use crate::token::{Token, TokenKind};
 
 #[derive(Debug)]
@@ -140,7 +140,7 @@ impl Lexer {
                     } else {
                         self.push_simple(&mut tokens, TokenKind::Star, 1);
                     }
-                },
+                }
                 '/' => match self.peek(1) {
                     Some('/') => {
                         while let Some(c) = self.cur() {
@@ -217,7 +217,7 @@ impl Lexer {
         self.increment();
         while let Some(c) = self.cur() {
             match c {
-                c if c==quote => {
+                c if c == quote => {
                     self.increment();
                     return Ok(Token::new(
                         if quote == '"' {
