@@ -54,6 +54,7 @@ pub enum AST {
         step: Option<Rc<AST>>,
         body: Rc<AST>,
     },
+    Comprehension(Span, String, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
     FormatStringLiteral(Span, Vec<String>, Vec<Rc<AST>>),
     Range(Span, Rc<AST>, Rc<AST>),
 
@@ -100,6 +101,7 @@ impl AST {
             AST::Break(span, ..) => span,
             AST::ForEach(span, ..) => span,
             AST::For { span, .. } => span,
+            AST::Comprehension(span, ..) => span,
             AST::FormatStringLiteral(span, ..) => span,
             AST::Range(span, ..) => span,
             AST::PostIncrement(span, ..) => span,
@@ -192,6 +194,12 @@ impl std::fmt::Display for AST {
                     write!(f, "{}", step)?;
                 }
                 write!(f, ")")
+            },
+            AST::Comprehension(_, var, iter, expr, cond) => {
+                match cond {
+                    Some(cond) => write!(f, "[{} for {} in {} if {}]", expr, var, iter, cond),
+                    None => write!(f, "[{} for {} in {}]", expr, var, iter),
+                }
             },
             AST::FormatStringLiteral(_, strings, exprs) => {
                 write!(f, "\"")?;

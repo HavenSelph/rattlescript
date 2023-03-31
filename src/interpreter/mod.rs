@@ -314,6 +314,35 @@ impl Interpreter {
                 Value::Nothing
             }
 
+            AST::Comprehension(span, var, iter, expr, cond) => {
+                let val = self.run(iter, scope.clone())?;
+                let iter_value = val.iterator(span)?;
+                match iter_value {
+                    Value::Iterator(IteratorValue(iter)) => {
+                        let iter = &mut *(*iter).borrow_mut();
+                        let mut vec = Vec::new();
+                        for val in iter {
+                            let loop_scope =
+                                Scope::new(Some(scope.clone()), scope.borrow_mut().in_function);
+                            loop_scope
+                                .borrow_mut()
+                                .insert(var, val.clone(), false, span)?;
+                            if let Some(cond) = cond {
+                                let condition = self.run(cond, loop_scope.clone())?;
+                                match condition {
+                                    Value::Boolean(true) => {}
+                                    Value::Boolean(false) => continue,
+                                    _ => error!(cond.span(), "Comprehension condition must be a boolean"),
+                                };
+                            }
+                            vec.push(self.run(expr, loop_scope)?);
+                        }
+                        Value::Array(make!(vec))
+                    }
+                    _ => error!(iter.span(), "Comprehension target must be iterable"),
+                }
+            }
+
             AST::For {
                 span,
                 init,

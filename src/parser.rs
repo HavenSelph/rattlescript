@@ -658,9 +658,14 @@ impl Parser {
                 ..
             } => {
                 let mut arr = vec![];
+                let mut comp = false;
                 self.increment();
                 while self.cur().kind != TokenKind::RightBracket {
                     arr.push(self.parse_expression()?);
+                    if arr.len() == 1 && self.cur().kind == TokenKind::For {
+                        comp = true;
+                        break;
+                    }
                     match self.cur().kind {
                         TokenKind::Comma => self.increment(),
                         TokenKind::RightBracket => {}
@@ -675,8 +680,23 @@ impl Parser {
                         ),
                     }
                 }
-                let end = self.consume(TokenKind::RightBracket)?.span;
-                Ok(Rc::new(AST::ArrayLiteral(span.extend(&end), arr)))
+                if comp {
+                    self.consume(TokenKind::For)?;
+                    let var = self.consume(TokenKind::Identifier)?;
+                    self.consume(TokenKind::In)?;
+                    let iter = self.parse_expression()?;
+                    let cond = if self.cur().kind == TokenKind::If {
+                        self.increment();
+                        Some(self.parse_expression()?)
+                    } else {
+                        None
+                    };
+                    let end = self.consume(TokenKind::RightBracket)?.span;
+                    Ok(Rc::new(AST::Comprehension(span.extend(&end), var.text.clone(), iter, arr.pop().unwrap(), cond)))
+                } else {
+                    let end = self.consume(TokenKind::RightBracket)?.span;
+                    Ok(Rc::new(AST::ArrayLiteral(span.extend(&end), arr)))
+                }
             }
             Token {
                 kind: TokenKind::Pipe,
