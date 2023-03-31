@@ -96,7 +96,14 @@ impl Parser {
         let start = self.consume(TokenKind::Pipe)?.span;
         let mut args = vec![];
         while self.cur().kind != TokenKind::Pipe {
-            args.push(self.consume(TokenKind::Identifier)?.text);
+            let name = self.consume(TokenKind::Identifier)?.text;
+            let default = if self.cur().kind == TokenKind::Equals {
+                self.increment();
+                Some(self.parse_expression()?)
+            } else {
+                None
+            };
+            args.push((name, default));
             if self.cur().kind == TokenKind::Comma {
                 self.increment();
             }
@@ -122,8 +129,23 @@ impl Parser {
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
         let mut args = vec![];
+        let mut seen_optional = false;
         while self.cur().kind != TokenKind::RightParen {
-            args.push(self.consume(TokenKind::Identifier)?.text);
+            let name = self.consume(TokenKind::Identifier)?.text;
+            let default = if self.cur().kind == TokenKind::Equals {
+                seen_optional = true;
+                self.increment();
+                Some(self.parse_expression()?)
+            } else {
+                if seen_optional {
+                    error!(
+                        self.cur().span,
+                        "Required argument cannot follow optional argument"
+                    );
+                }
+                None
+            };
+            args.push((name, default));
             if self.cur().kind == TokenKind::Comma {
                 self.increment();
             }
@@ -214,7 +236,7 @@ impl Parser {
                 Ok(Rc::new(AST::Assignment(
                     span.extend(deco.span()),
                     Rc::new(AST::Variable(span.extend(deco.span()), name)),
-                    Rc::new(AST::Call(span.extend(deco.span()), deco, vec![func])),
+                    Rc::new(AST::Call(span.extend(deco.span()), deco, vec![(None, func)])),
                 )))
             }
             Token {
@@ -576,7 +598,16 @@ impl Parser {
                                 break;
                             }
                             _ => {
-                                args.push(self.parse_expression()?);
+                                let mut arg = self.parse_expression()?;
+                                let mut label = None;
+                                if let AST::Variable(_, name) = &*arg {
+                                    if self.cur().kind == TokenKind::Colon {
+                                        label = Some(name.clone());
+                                        self.increment();
+                                        arg = self.parse_expression()?;
+                                    }
+                                }
+                                args.push((label, arg));
                                 match self.cur().kind {
                                     TokenKind::Comma => self.increment(),
                                     TokenKind::RightParen => {}
@@ -608,13 +639,13 @@ impl Parser {
                     span,
                     ..
                 } => {
-                    let offset = if self.cur().kind == TokenKind::PlusPlus { 1 } else { -1 };
+                    let offset = if self.cur().kind == TokenKind::PlusPlus {
+                        1
+                    } else {
+                        -1
+                    };
                     self.increment();
-                    val = Rc::new(AST::PostIncrement(
-                        val.span().extend(&span),
-                        val,
-                        offset,
-                    ));
+                    val = Rc::new(AST::PostIncrement(val.span().extend(&span), val, offset));
                 }
                 _ => break,
             }
@@ -635,12 +666,14 @@ impl Parser {
                 while self.cur().kind != TokenKind::RightParen {
                     exprs.push(self.parse_expression()?);
                     match self.cur().kind {
-                        TokenKind::Comma => {self.increment(); tup = true;},
+                        TokenKind::Comma => {
+                            self.increment();
+                            tup = true;
+                        }
                         TokenKind::RightParen => {}
-                        TokenKind::EOF => eof_error!(
-                            self.cur().span,
-                            "Expected `)` or ',' but got EOF"
-                        ),
+                        TokenKind::EOF => {
+                            eof_error!(self.cur().span, "Expected `)` or ',' but got EOF")
+                        }
                         _ => error!(
                             self.cur().span,
                             "Expected `)` or `,` but got {:?}",

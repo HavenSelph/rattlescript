@@ -71,7 +71,7 @@ pub struct Function {
     pub span: Span,
     pub name: String,
     pub body: Rc<AST>,
-    pub args: Vec<String>,
+    pub args: Vec<(String, Option<Value>)>,
     pub scope: Ref<Scope>,
 }
 
@@ -160,7 +160,9 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 + *right),
             (Value::Float(left), Value::Float(right)) => Value::Float(*left + *right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left + *right as f64),
-            (Value::String(left), Value::String(right)) => Value::String(make!(left.borrow().clone() + get!(right))),
+            (Value::String(left), Value::String(right)) => {
+                Value::String(make!(left.borrow().clone() + get!(right)))
+            }
             _ => error!(span, "Invalid types for addition"),
         })
     }
@@ -234,15 +236,26 @@ impl Value {
             Value::String(s) => {
                 let s = s.borrow();
                 let (start, end, step) = get_slice_params(span, start, end, step, s.len() as i64)?;
-                let res = s.chars().take(end as usize).skip(start as usize).step_by(step as usize).collect::<String>();
+                let res = s
+                    .chars()
+                    .take(end as usize)
+                    .skip(start as usize)
+                    .step_by(step as usize)
+                    .collect::<String>();
                 Ok(Value::String(make!(res)))
-            },
+            }
             Value::Array(a) => {
                 let a = a.borrow();
                 let (start, end, step) = get_slice_params(span, start, end, step, a.len() as i64)?;
-                let res = a.iter().take(end as usize).skip(start as usize).step_by(step as usize).cloned().collect::<Vec<_>>();
+                let res = a
+                    .iter()
+                    .take(end as usize)
+                    .skip(start as usize)
+                    .step_by(step as usize)
+                    .cloned()
+                    .collect::<Vec<_>>();
                 Ok(Value::Array(make!(res)))
-            },
+            }
             _ => error!(span, "Can only slice strings"),
         }
     }

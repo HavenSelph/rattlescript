@@ -162,14 +162,18 @@ impl Interpreter {
                 let func = Value::Function(make!(Function {
                     span: *span,
                     name: name.clone().unwrap_or_else(|| "<anon>".to_string()),
-                    args: args.clone(),
+                    args: args
+                        .iter()
+                        .map(|(name, def)| (
+                            name.clone(),
+                            def.as_ref().map(|def| self.run(def, scope.clone()).unwrap())
+                        ))
+                        .collect(),
                     body: body.clone(),
                     scope: scope.clone(),
                 }));
                 match name {
-                    Some(name) => scope
-                        .borrow_mut()
-                        .insert(name, func.clone(), false, span)?,
+                    Some(name) => scope.borrow_mut().insert(name, func.clone(), false, span)?,
                     None => {}
                 }
                 func
@@ -333,7 +337,10 @@ impl Interpreter {
                                 match condition {
                                     Value::Boolean(true) => {}
                                     Value::Boolean(false) => continue,
-                                    _ => error!(cond.span(), "Comprehension condition must be a boolean"),
+                                    _ => error!(
+                                        cond.span(),
+                                        "Comprehension condition must be a boolean"
+                                    ),
                                 };
                             }
                             vec.push(self.run(expr, loop_scope)?);
@@ -487,27 +494,45 @@ impl Interpreter {
         scope: Ref<Scope>,
         span: &Span,
         func: &Rc<AST>,
-        args: &[Rc<AST>],
+        args: &[(Option<String>, Rc<AST>)],
     ) -> Result<Value> {
         let func = self.run(func, scope.clone())?;
-        let args = args
-            .iter()
-            .map(|arg| self.run(arg, scope.clone()))
-            .collect::<Result<Vec<_>>>()?;
-
         return Ok(match func {
             Value::Function(func) => {
                 let new_scope = Scope::new(Some(func.borrow().scope.clone()), true);
-                if args.len() != func.borrow().args.len() {
+                if args.len() > func.borrow().args.len() {
                     error!(
-                        *span,
-                        "Expected {} arguments, got {}",
+                        span,
+                        "Function expected no more than {} arguments, got {}",
                         func.borrow().args.len(),
                         args.len()
                     )
-                }
-                for (arg, value) in func.borrow().args.iter().zip(args) {
-                    new_scope.borrow_mut().insert(arg, value, false, span)?;
+                } else {
+                    let func = func.borrow();
+                    for (i, (name, default)) in func.args.iter().enumerate() {
+                        if i < args.len() {
+                            let (label, arg) = &args[i];
+                            let arg = self.run(&arg, scope.clone())?;
+                            if let Some(label) = label {
+                                if label != name {
+                                    error!(
+                                        span,
+                                        "Function argument {} is required, but {} was provided",
+                                        name, label
+                                    )
+                                }
+                            }
+                            new_scope.borrow_mut().insert(name, arg, false, span)?;
+                        } else if let Some(default) = default {
+                            new_scope.borrow_mut().insert(name, default.clone(), false, span)?;
+                        } else {
+                            error!(
+                                span,
+                                "Function argument {} is required, but not provided",
+                                name
+                            )
+                        }
+                    }
                 }
                 let body = func.borrow().body.clone();
                 self.run(&body, new_scope)?;
@@ -519,9 +544,17 @@ impl Interpreter {
                 self.control_flow = ControlFlow::None;
                 value
             }
-            Value::BuiltInFunction(func) => match self.builtins.get(func.borrow().as_str()) {
-                Some(func) => func(span, args)?,
-                None => error!(span, "Built-in function {} not found", func.borrow()),
+            Value::BuiltInFunction(func) => {
+                let args = args
+                            .iter()
+                            .map(|(_, arg)| self.run(arg, scope.clone()))
+                            .collect::<Result<Vec<_>>>()?;
+                match self.builtins.get(func.borrow().as_str()) {
+                    Some(func) => {
+                        func(span, args)?
+                    }
+                    None => error!(span, "Built-in function {} not found", func.borrow()),
+                }
             },
             x => error!(span, "Can't call object {:?}", x),
         });

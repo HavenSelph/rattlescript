@@ -8,13 +8,13 @@ pub enum AST {
     Assignment(Span, Rc<AST>, Rc<AST>),
     Block(Span, Vec<Rc<AST>>),
     BooleanLiteral(Span, bool),
-    Call(Span, Rc<AST>, Vec<Rc<AST>>),
+    Call(Span, Rc<AST>, Vec<(Option<String>, Rc<AST>)>),
     Divide(Span, Rc<AST>, Rc<AST>),
     FloatLiteral(Span, f64),
     Function {
         span: Span,
         name: Option<String>,
-        args: Vec<String>,
+        args: Vec<(String, Option<Rc<AST>>)>,
         body: Rc<AST>,
     },
     If(Span, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
@@ -124,7 +124,7 @@ impl std::fmt::Display for AST {
             AST::BooleanLiteral(_, val) => write!(f, "{}", val),
             AST::Call(_, func, args) => {
                 write!(f, "{}(", func)?;
-                for (i, arg) in args.iter().enumerate() {
+                for (i, (_, arg)) in args.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
