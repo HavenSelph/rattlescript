@@ -60,6 +60,7 @@ pub enum AST {
     PostIncrement(Span, Rc<AST>, i64),
     PreIncrement(Span, Rc<AST>, i64),
     ArrayLiteral(Span, Vec<Rc<AST>>),
+    TupleLiteral(Span, Vec<Rc<AST>>),
 }
 
 impl AST {
@@ -104,6 +105,7 @@ impl AST {
             AST::PostIncrement(span, ..) => span,
             AST::PreIncrement(span, ..) => span,
             AST::ArrayLiteral(span, ..) => span,
+            AST::TupleLiteral(span, ..) => span,
         }
     }
 }
@@ -213,6 +215,19 @@ impl std::fmt::Display for AST {
                     write!(f, "{}", expr)?;
                 }
                 write!(f, "]")
+            }
+            AST::TupleLiteral(_, exprs) => {
+                write!(f, "(")?;
+                for (i, expr) in exprs.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", expr)?;
+                }
+                if exprs.len() == 1 {
+                    write!(f, ",")?;
+                }
+                write!(f, ")")
             }
         }
     }

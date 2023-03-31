@@ -29,7 +29,7 @@ pub fn len(span: &Span, args: Vec<Value>) -> Result<Value> {
 
     Ok(match &args[0] {
         Value::String(string) => Value::Integer(string.borrow().len() as i64),
-        Value::Array(array) => Value::Integer(array.borrow().len() as i64),
+        Value::Array(array) | Value::Tuple(array) => Value::Integer(array.borrow().len() as i64),
         Value::Range(start, end) => Value::Integer(end - start),
         other => error!(span, "len() does not support {:?}", other),
     })

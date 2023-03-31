@@ -412,6 +412,14 @@ impl Interpreter {
                         .collect::<Result<Vec<_>>>()?
                 ))
             }
+
+            AST::TupleLiteral(_, arr) => {
+                Value::Tuple(make!(
+                    arr.iter()
+                        .map(|x| self.run(x, scope.clone()))
+                        .collect::<Result<Vec<_>>>()?
+                ))
+            }
         })
     }
 

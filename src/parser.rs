@@ -623,12 +623,34 @@ impl Parser {
         match self.cur() {
             Token {
                 kind: TokenKind::LeftParen,
+                span,
                 ..
             } => {
                 self.increment();
-                let expr = self.parse_expression()?;
+                let mut exprs = vec![];
+                let mut tup = false;
+                while self.cur().kind != TokenKind::RightParen {
+                    exprs.push(self.parse_expression()?);
+                    match self.cur().kind {
+                        TokenKind::Comma => {self.increment(); tup = true;},
+                        TokenKind::RightParen => {}
+                        TokenKind::EOF => eof_error!(
+                            self.cur().span,
+                            "Expected `)` or ',' but got EOF"
+                        ),
+                        _ => error!(
+                            self.cur().span,
+                            "Expected `)` or `,` but got {:?}",
+                            self.cur().kind
+                        ),
+                    }
+                }
+                let end = self.cur().span;
                 self.consume(TokenKind::RightParen)?;
-                Ok(expr)
+                match exprs.len() {
+                    1 if !tup => Ok(exprs.pop().unwrap()),
+                    _ => Ok(Rc::new(AST::TupleLiteral(span.extend(&end), exprs)))
+                }
             }
             Token {
                 kind: TokenKind::LeftBracket,

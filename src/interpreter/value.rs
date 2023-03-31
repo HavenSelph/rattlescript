@@ -78,6 +78,7 @@ pub struct Function {
 #[derive(Clone)]
 pub enum Value {
     Array(Ref<Vec<Value>>),
+    Tuple(Ref<Vec<Value>>),
     Boolean(bool),
     BuiltInFunction(Ref<String>),
     Float(f64),
@@ -114,6 +115,16 @@ impl std::fmt::Debug for Value {
                 }
                 write!(f, "]")
             }
+            Value::Tuple(tuple) => {
+                write!(f, "(")?;
+                for (i, item) in tuple.borrow().iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", item.repr())?;
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -127,7 +138,8 @@ impl std::cmp::PartialEq for Value {
             (Value::Float(left), Value::Integer(right)) => *left == *right as f64,
             (Value::String(left), Value::String(right)) => *left.borrow() == *right.borrow(),
             (Value::Boolean(left), Value::Boolean(right)) => *left == *right,
-            (Value::Array(left), Value::Array(right)) => {
+            (Value::Array(left), Value::Array(right))
+            | (Value::Tuple(left), Value::Tuple(right)) => {
                 let left = left.borrow();
                 let right = right.borrow();
                 if left.len() != right.len() {
@@ -284,7 +296,7 @@ impl Value {
         Ok(match self {
             Value::String(s) => Value::Iterator(IteratorValue::for_string(s.clone())),
             Value::Range(start, end) => Value::Iterator(IteratorValue::for_range(start, end)),
-            Value::Array(arr) => Value::Iterator(IteratorValue::for_array(arr.clone())),
+            Value::Array(arr) | Value::Tuple(arr) => Value::Iterator(IteratorValue::for_array(arr.clone())),
             _ => error!(span, "Cannot iterate over this type"),
         })
     }
@@ -316,6 +328,21 @@ impl Value {
                 s.push(']');
                 s
             }
+            Value::Tuple(tup) => {
+                let tup = tup.borrow();
+                let mut s = "(".to_string();
+                for (i, v) in tup.iter().enumerate() {
+                    if i > 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&v.repr());
+                }
+                if tup.len() == 1 {
+                    s.push(',');
+                }
+                s.push(')');
+                s
+            }
         }
     }
 
@@ -340,12 +367,19 @@ impl Value {
                     None => error!(span, "Index out of bounds"),
                 }
             }
+            (Value::Tuple(tup), Value::Integer(index)) => {
+                match tup.borrow().get(*index as usize) {
+                    Some(v) => v.clone(),
+                    None => error!(span, "Index out of bounds"),
+                }
+            }
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
     }
 
     pub fn set_index(&self, index: &Value, value: &Value, span: &Span) -> Result<()> {
         match (self, index) {
+            (Value::Tuple(_), _) => error!(span, "Can't set index on tuple"),
             (Value::Array(arr), Value::Integer(index)) => {
                 let mut arr = arr.borrow_mut();
                  match arr.get_mut(*index as usize) {
