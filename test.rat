@@ -94,4 +94,6 @@ print(list)
 list[2] = "Hello"
 print(list)
 
-let tup =  (1, 2, 3)
+let tup = (1, 2, 3, 4)
+
+print([i+1 for i in tup if i==0])
