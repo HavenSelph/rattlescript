@@ -236,7 +236,11 @@ impl Parser {
                 Ok(Rc::new(AST::Assignment(
                     span.extend(deco.span()),
                     Rc::new(AST::Variable(span.extend(deco.span()), name)),
-                    Rc::new(AST::Call(span.extend(deco.span()), deco, vec![(None, func)])),
+                    Rc::new(AST::Call(
+                        span.extend(deco.span()),
+                        deco,
+                        vec![(None, func)],
+                    )),
                 )))
             }
             Token {
@@ -384,11 +388,7 @@ impl Parser {
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
-                    Rc::new(AST::Plus(
-                        left.span().extend(right.span()),
-                        left,
-                        right,
-                    )),
+                    Rc::new(AST::Plus(left.span().extend(right.span()), left, right)),
                 )))
             }
             Token {
@@ -400,11 +400,7 @@ impl Parser {
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
-                    Rc::new(AST::Minus(
-                        left.span().extend(right.span()),
-                        left,
-                        right,
-                    )),
+                    Rc::new(AST::Minus(left.span().extend(right.span()), left, right)),
                 )))
             }
             Token {
@@ -416,11 +412,7 @@ impl Parser {
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
-                    Rc::new(AST::Multiply(
-                        left.span().extend(right.span()),
-                        left,
-                        right,
-                    )),
+                    Rc::new(AST::Multiply(left.span().extend(right.span()), left, right)),
                 )))
             }
             Token {
@@ -432,11 +424,7 @@ impl Parser {
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
-                    Rc::new(AST::Divide(
-                        left.span().extend(right.span()),
-                        left,
-                        right,
-                    )),
+                    Rc::new(AST::Divide(left.span().extend(right.span()), left, right)),
                 )))
             }
             _ => Ok(left),

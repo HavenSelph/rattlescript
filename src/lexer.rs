@@ -140,7 +140,7 @@ impl Lexer {
                     Some('*') => self.push_simple(&mut tokens, TokenKind::StarStar, 2),
                     Some('=') => self.push_simple(&mut tokens, TokenKind::StarEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Star, 1),
-                }
+                },
                 '/' => match self.peek(1) {
                     Some('/') => {
                         while let Some(c) = self.cur() {

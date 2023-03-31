@@ -166,7 +166,8 @@ impl Interpreter {
                         .iter()
                         .map(|(name, def)| (
                             name.clone(),
-                            def.as_ref().map(|def| self.run(def, scope.clone()).unwrap())
+                            def.as_ref()
+                                .map(|def| self.run(def, scope.clone()).unwrap())
                         ))
                         .collect(),
                     body: body.clone(),
@@ -512,18 +513,20 @@ impl Interpreter {
                                     error!(
                                         span,
                                         "Function argument {} is required, but {} was provided",
-                                        name, label
+                                        name,
+                                        label
                                     )
                                 }
                             }
                             new_scope.borrow_mut().insert(name, arg, false, span)?;
                         } else if let Some(default) = default {
-                            new_scope.borrow_mut().insert(name, default.clone(), false, span)?;
+                            new_scope
+                                .borrow_mut()
+                                .insert(name, default.clone(), false, span)?;
                         } else {
                             error!(
                                 span,
-                                "Function argument {} is required, but not provided",
-                                name
+                                "Function argument {} is required, but not provided", name
                             )
                         }
                     }
@@ -540,16 +543,14 @@ impl Interpreter {
             }
             Value::BuiltInFunction(func) => {
                 let args = args
-                            .iter()
-                            .map(|(_, arg)| self.run(arg, scope.clone()))
-                            .collect::<Result<Vec<_>>>()?;
+                    .iter()
+                    .map(|(_, arg)| self.run(arg, scope.clone()))
+                    .collect::<Result<Vec<_>>>()?;
                 match self.builtins.get(func.borrow().as_str()) {
-                    Some(func) => {
-                        func(span, args)?
-                    }
+                    Some(func) => func(span, args)?,
                     None => error!(span, "Built-in function {} not found", func.borrow()),
                 }
-            },
+            }
             x => error!(span, "Can't call object {:?}", x),
         });
     }
