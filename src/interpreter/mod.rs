@@ -434,6 +434,11 @@ impl Interpreter {
                     .borrow_mut()
                     .insert(name.as_str(), value, true, span)?;
             }
+            AST::Index(span, left, right) => {
+                let left = self.run(left, scope.clone())?;
+                let right = self.run(right, scope)?;
+                left.set_index(&right, &value, span)?;
+            }
             _ => error!(span, "Invalid assignment target"),
         }
         Ok(())

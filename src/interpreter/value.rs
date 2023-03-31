@@ -227,7 +227,7 @@ impl Value {
 
     pub fn not(&self, span: &Span) -> Result<Value> {
         Ok(match self {
-            Value::Boolean(b) => Value::Boolean(!b),
+            Value::Boolean(b) => Value::Boolean(!*b),
             _ => error!(span, "Invalid type for not"),
         })
     }
@@ -342,5 +342,21 @@ impl Value {
             }
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
+    }
+
+    pub fn set_index(&self, index: &Value, value: &Value, span: &Span) -> Result<()> {
+        match (self, index) {
+            (Value::Array(arr), Value::Integer(index)) => {
+                let mut arr = arr.borrow_mut();
+                 match arr.get_mut(*index as usize) {
+                    Some(v) => {
+                        *v = value.clone();
+                    }
+                    None => error!(span, "Index out of bounds"),
+                }
+            }
+            (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
+        }
+        Ok(())
     }
 }
