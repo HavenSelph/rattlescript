@@ -621,7 +621,7 @@ impl Interpreter {
                         fields
                     }),
                 );
-                dbg!(instance)
+                instance
             }
             x => error!(span, "Can't call object {:?}", x),
         });
