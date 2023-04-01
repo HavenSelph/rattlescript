@@ -47,3 +47,22 @@ pub fn exit(span: &Span, args: Vec<Value>) -> Result<Value> {
         Err(_) => std::process::exit(1),
     }
 }
+
+pub fn input(span: &Span, args: Vec<Value>) -> Result<Value> {
+    let prompt = if args.len() == 1 {
+        match &args[0] {
+            Value::String(string) => string.borrow().clone(),
+            _ => error!(span, "input() may only take a string as argument"),
+        }
+    } else if args.len() == 0 {
+        String::new()
+    } else {
+        error!(span, "input() takes either one or no arguments");
+    };
+    let mut input = String::new();
+    print!("{}", prompt);
+    std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    std::io::stdin().read_line(&mut input).unwrap();
+    input = input.trim_end().to_string();
+    Ok(Value::String(make!(input)))
+}

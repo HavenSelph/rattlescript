@@ -77,7 +77,7 @@ macro_rules! builtins {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let builtins = builtins!(print, repr, len, exit);
+        let builtins = builtins!(print, repr, len, exit, input);
         Self {
             builtins,
             control_flow: ControlFlow::None,
