@@ -1,8 +1,9 @@
 use crate::ast::AST;
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::{Function, IteratorValue, Value};
+use crate::interpreter::value::{Class, ClassInstance, Function, IteratorValue, Value};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::rc::Rc;
 
 mod builtin;
@@ -179,7 +180,47 @@ impl Interpreter {
                 }
                 func
             }
-
+            AST::FieldAccess(span, obj, field) => {
+                let obj = self.run(obj, scope)?;
+                match obj {
+                    Value::ClassInstance(instance) => {
+                        match instance.borrow().fields.get(field) {
+                            Some(val) => val.clone(),
+                            None => {
+                                error!(span, "Field '{}' not found on class instance", field);
+                            }
+                        }
+                    }
+                    _ => {
+                        error!(span, "Cannot access field '{}' on non-class instance", field);
+                    }
+                }
+            }
+            AST::Class {
+                span,
+                name,
+                fields,
+                methods
+            } => {
+                let class = Value::Class(make!(Class {
+                    span: *span,
+                    name: name.clone(),
+                    fields: fields
+                        .iter()
+                        .map(|(name, def)| (
+                            name.clone(),
+                            def.as_ref()
+                                .map(|def| self.run(def, scope.clone()).unwrap())
+                        ))
+                        .collect(),
+                    methods: methods.iter().map(|(name, func)| {
+                        let func = self.run(func, scope.clone()).expect("function");
+                        (name.clone(), func)
+                    }).collect()
+                }));
+                scope.borrow_mut().insert(name, class.clone(), false, span)?;
+                class
+            }
             AST::Slice {
                 span,
                 lhs,
@@ -207,7 +248,6 @@ impl Interpreter {
                 let block_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
                 self.run_block_without_new_scope(ast, block_scope)?
             }
-
             AST::Variable(span, name) => {
                 if self.builtins.get(name.as_str()).is_some() {
                     Value::BuiltInFunction(make!(name.clone()))
@@ -217,7 +257,6 @@ impl Interpreter {
                     error!(span, "Variable {} not found", name)
                 }
             }
-
             AST::Return(span, val) => {
                 if !scope.borrow_mut().in_function {
                     error!(span, "Return statement outside of function")
@@ -225,13 +264,11 @@ impl Interpreter {
                 self.control_flow = ControlFlow::Return(self.run(val, scope)?);
                 Value::Nothing
             }
-
             AST::Assignment(span, lhs, value) => {
                 let value = self.run(value, scope.clone())?;
                 self.handle_assign(scope, span, lhs, value.clone())?;
                 value
             }
-
             AST::VarDeclaration(span, name, value) => {
                 if self.builtins.contains_key(name.as_str()) {
                     error!(
@@ -245,7 +282,6 @@ impl Interpreter {
                     .insert(name, value.clone(), false, span)?;
                 value
             }
-
             AST::Assert(loc, cond) => {
                 let cond = self.run(cond, scope)?;
                 match cond {
@@ -255,7 +291,6 @@ impl Interpreter {
                 }
                 Value::Nothing
             }
-
             AST::If(span, cond, body, else_body) => {
                 let cond = self.run(cond, scope.clone())?;
                 match cond {
@@ -267,7 +302,6 @@ impl Interpreter {
                     _ => error!(span, "If condition must be a boolean"),
                 }
             }
-
             AST::While(span, cond, body) => {
                 loop {
                     let cond = self.run(cond, scope.clone())?;
@@ -290,7 +324,6 @@ impl Interpreter {
                 }
                 Value::Nothing
             }
-
             AST::ForEach(span, loop_var, iter, body) => {
                 let val = self.run(iter, scope.clone())?;
                 let iter = val.iterator(span)?;
@@ -319,7 +352,6 @@ impl Interpreter {
                 };
                 Value::Nothing
             }
-
             AST::Comprehension(span, var, iter, expr, cond) => {
                 let val = self.run(iter, scope.clone())?;
                 let iter_value = val.iterator(span)?;
@@ -351,7 +383,6 @@ impl Interpreter {
                     _ => error!(iter.span(), "Comprehension target must be iterable"),
                 }
             }
-
             AST::For {
                 span,
                 init,
@@ -413,13 +444,11 @@ impl Interpreter {
                 self.control_flow = ControlFlow::Continue;
                 Value::Nothing
             }
-
             AST::Index(span, left, right) => {
                 let left = self.run(left, scope.clone())?;
                 let right = self.run(right, scope)?;
                 left.index(&right, span)?
             }
-
             AST::PostIncrement(span, expr, offset) => {
                 let value = self.run(expr, scope.clone())?;
                 match &value {
@@ -442,12 +471,10 @@ impl Interpreter {
                     _ => error!(span, "Operation only supported for integers"),
                 }
             }
-
             AST::ArrayLiteral(_, arr) => Value::Array(make!(arr
                 .iter()
                 .map(|x| self.run(x, scope.clone()))
                 .collect::<Result<Vec<_>>>()?)),
-
             AST::TupleLiteral(_, arr) => Value::Tuple(make!(arr
                 .iter()
                 .map(|x| self.run(x, scope.clone()))
@@ -479,6 +506,10 @@ impl Interpreter {
                 let right = self.run(right, scope)?;
                 left.set_index(&right, &value, span)?;
             }
+            AST::FieldAccess(span, left, name) => {
+                let left = self.run(left, scope)?;
+                left.set_field(name.as_str(), &value, span)?;
+            }
             _ => error!(span, "Invalid assignment target"),
         }
         Ok(())
@@ -491,10 +522,18 @@ impl Interpreter {
         func: &Rc<AST>,
         args: &[(Option<String>, Rc<AST>)],
     ) -> Result<Value> {
-        let func = self.run(func, scope.clone())?;
-        return Ok(match func {
+        let parent = match func.deref() {
+            AST::FieldAccess(_, left, ..) => Some(left),
+            _ => None,
+        };
+        let callee = self.run(func, scope.clone())?;
+        return Ok(match callee {
             Value::Function(func) => {
                 let new_scope = Scope::new(Some(func.borrow().scope.clone()), true);
+                if let Some(parent) = parent {
+                    let parent = self.run(parent, scope.clone())?;
+                    new_scope.borrow_mut().insert("self", parent, false, span)?;
+                }
                 if args.len() > func.borrow().args.len() {
                     error!(
                         span,
@@ -507,7 +546,7 @@ impl Interpreter {
                     for (i, (name, default)) in func.args.iter().enumerate() {
                         if i < args.len() {
                             let (label, arg) = &args[i];
-                            let arg = self.run(&arg, scope.clone())?;
+                            let arg = self.run(arg, scope.clone())?;
                             if let Some(label) = label {
                                 if label != name {
                                     error!(
@@ -550,6 +589,39 @@ impl Interpreter {
                     Some(func) => func(span, args)?,
                     None => error!(span, "Built-in function {} not found", func.borrow()),
                 }
+            }
+            Value::Class(class) => {
+                let _class = class.borrow();
+                let mut fields: HashMap<String, Value> = HashMap::new();
+                for method in _class.methods.iter() {
+                    fields.insert(method.0.clone(), method.1.clone());
+                }
+                let args = args
+                    .iter()
+                    .map(|(_, arg)| self.run(arg, scope.clone()))
+                    .collect::<Result<Vec<_>>>()?;
+                if args.len() > _class.fields.len() {
+                    error!(span, "Class expected no more than {:?} arguments, got {:?}", _class.fields.len(), args.len());
+                }
+                for (i, (name, default)) in _class.fields.iter().enumerate() {
+                    if i < args.len() {
+                        let arg = &args[i];
+                        fields.insert(name.clone(), arg.clone());
+                    }
+                    else if let Some(default) = default {
+                        fields.insert(name.clone(), default.clone());
+                    }
+                    else {
+                        error!(span, "Class argument {} is required, but not provided", name);
+                    }
+                }
+                let instance = Value::ClassInstance(
+                    make!(ClassInstance {
+                        class: class.clone(),
+                        fields
+                    }),
+                );
+                dbg!(instance)
             }
             x => error!(span, "Can't call object {:?}", x),
         });

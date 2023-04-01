@@ -75,6 +75,18 @@ pub struct Function {
     pub scope: Ref<Scope>,
 }
 
+pub struct Class {
+    pub span: Span,
+    pub name: String,
+    pub fields: Vec<(String, Option<Value>)>,
+    pub methods: Vec<(String, Value)>,
+}
+
+pub struct ClassInstance {
+    pub class: Ref<Class>,
+    pub fields: std::collections::HashMap<String, Value>,
+}
+
 #[derive(Clone)]
 pub enum Value {
     Array(Ref<Vec<Value>>),
@@ -82,6 +94,8 @@ pub enum Value {
     Boolean(bool),
     BuiltInFunction(Ref<String>),
     Float(f64),
+    Class(Ref<Class>),
+    ClassInstance(Ref<ClassInstance>),
     Function(Ref<Function>),
     Integer(i64),
     Iterator(IteratorValue),
@@ -104,6 +118,15 @@ impl std::fmt::Debug for Value {
             Value::Function(func) => {
                 let func = func.borrow();
                 write!(f, "<function {}: {}>", func.name, func.span.0)
+            }
+            Value::Class(class) => {
+                let class = class.borrow();
+                write!(f, "<class {}: {}>", class.name, class.span.0)
+            }
+            Value::ClassInstance(instance) => {
+                let instance = instance.borrow();
+                let class = instance.class.borrow();
+                write!(f, "<instance of {}: {}>", class.name, class.span.0)
             }
             Value::Array(array) => {
                 write!(f, "[")?;
@@ -129,6 +152,7 @@ impl std::fmt::Debug for Value {
     }
 }
 
+#[allow(unused_qualifications)]
 impl std::cmp::PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -347,6 +371,14 @@ impl Value {
                 let func = func.borrow();
                 format!("<function {}: {}>", func.name, func.span.0)
             }
+            Value::Class(class) => {
+                let class = class.borrow();
+                format!("<class {}: {}>", class.name, class.span.0)
+            }
+            Value::ClassInstance(inst) => {
+                let inst = inst.borrow();
+                format!("<instance of cls {}>", inst.class.borrow().name)
+            }
             Value::Range(start, end) => format!("{}..{}", start, end),
             Value::BuiltInFunction(name) => format!("<built-in function {}>", name.borrow()),
             Value::Nothing => "nothing".to_string(),
@@ -420,6 +452,17 @@ impl Value {
                 }
             }
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
+        }
+        Ok(())
+    }
+
+    pub fn set_field(&self, field: &str, value: &Value, span: &Span) -> Result<()> {
+        match self {
+            Value::ClassInstance(inst) => {
+                let mut inst = inst.borrow_mut();
+                inst.fields.insert(field.to_string(), value.clone());
+            }
+            _ => error!(span, "Can't set field on this type"),
         }
         Ok(())
     }

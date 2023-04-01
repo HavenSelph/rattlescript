@@ -49,6 +49,22 @@ impl Parser {
         }
     }
 
+    fn consume_line_end(&mut self) -> Result<()> {
+        if self.cur().newline_before {
+            return Ok(());
+        }
+        match self.cur().kind {
+            TokenKind::SemiColon => self.increment(),
+            TokenKind::EOF => {}
+            _ => error!(
+                self.cur().span,
+                "Expected line end, but got {:?}",
+                self.cur().kind
+            ),
+        }
+        Ok(())
+    }
+
     pub fn parse(&mut self) -> Result<Rc<AST>> {
         let res = self.parse_block(/*global*/ true)?;
         self.consume(TokenKind::EOF)?;
@@ -76,20 +92,68 @@ impl Parser {
         Ok(Rc::new(AST::Block(span, statements)))
     }
 
-    fn consume_line_end(&mut self) -> Result<()> {
-        if self.cur().newline_before {
-            return Ok(());
+    fn parse_class(&mut self) -> Result<(Rc<AST>, String)> {
+        let start = self.consume(TokenKind::Cls)?.span;
+        let name = self.consume(TokenKind::Identifier)?;
+        let mut fields: Vec<(String, Option<Rc<AST>>)> = vec![];
+        let mut methods: Vec<(String, Rc<AST>)> = vec![];
+        let mut comma = true;
+        let mut default = false;
+        self.consume(TokenKind::LeftBrace)?;
+        loop {
+            match self.cur().kind {
+                TokenKind::RightBrace => {
+                    if fields.is_empty() {
+                        error!(self.cur().span, "Classes must have at least one field");
+                    } else {
+                        break;
+                    }
+                }
+                TokenKind::Identifier => {
+                    if !methods.is_empty() {
+                        error!(self.cur().span, "Fields must be declared before methods");
+                    } else if !comma {
+                        error!(self.cur().span, "Expected comma after field declaration");
+                    }
+                    let name = self.consume(TokenKind::Identifier)?.text;
+                    let default = if self.cur().kind == TokenKind::Equals {
+                        default = true;
+                        self.increment();
+                        Some(self.parse_expression()?)
+                    } else {
+                        if default {
+                            error!(self.cur().span, "Expected default value for field");
+                        }
+                        None
+                    };
+                    fields.push((name, default));
+                    if self.cur().kind == TokenKind::Comma {
+                        comma = true;
+                        self.increment();
+                    } else {
+                        comma = false;
+                    }
+                }
+                TokenKind::Def => {
+                    let (func, name) = self.parse_function()?;
+                    methods.push((name, func));
+                }
+                TokenKind::EOF => {
+                    eof_error!(self.cur().span, "Expected field or method declaration")
+                }
+                _ => error!(self.cur().span, "Expected field or method declaration"),
+            }
         }
-        match self.cur().kind {
-            TokenKind::SemiColon => self.increment(),
-            TokenKind::EOF => {}
-            _ => error!(
-                self.cur().span,
-                "Expected line end, but got {:?}",
-                self.cur().kind
-            ),
-        }
-        Ok(())
+        let end = self.consume(TokenKind::RightBrace)?.span;
+        Ok((
+            Rc::new(AST::Class {
+                span: start.extend(&end),
+                name: name.text.clone(),
+                fields,
+                methods,
+            }),
+            name.text,
+        ))
     }
 
     fn parse_lambda(&mut self) -> Result<Rc<AST>> {
@@ -219,6 +283,10 @@ impl Parser {
                     _ => Ok(Rc::new(AST::If(span, cond, body, None))),
                 }
             }
+            Token {
+                kind: TokenKind::Cls,
+                ..
+            } => Ok(self.parse_class()?.0),
             Token {
                 kind: TokenKind::Def,
                 ..
@@ -687,6 +755,18 @@ impl Parser {
                     val = Rc::new(AST::Call(span, val, args));
                 }
                 Token {
+                    kind: TokenKind::Dot,
+                    ..
+                } => {
+                    self.increment();
+                    let name = self.consume(TokenKind::Identifier)?;
+                    val = Rc::new(AST::FieldAccess(
+                        val.span().extend(&name.span),
+                        val,
+                        name.text.clone()
+                    ));
+                }
+                Token {
                     kind: TokenKind::DotDot,
                     ..
                 } => {
@@ -789,7 +869,7 @@ impl Parser {
                     let end = self.consume(TokenKind::RightBracket)?.span;
                     Ok(Rc::new(AST::Comprehension(
                         span.extend(&end),
-                        var.text.clone(),
+                        var.text,
                         iter,
                         arr.pop().unwrap(),
                         cond,

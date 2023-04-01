@@ -7,6 +7,12 @@ pub enum AST {
     Assert(Span, Rc<AST>),
     Assignment(Span, Rc<AST>, Rc<AST>),
     Block(Span, Vec<Rc<AST>>),
+    Class {
+        span: Span,
+        name: String,
+        fields: Vec<(String, Option<Rc<AST>>)>,
+        methods: Vec<(String, Rc<AST>)>,
+    },
     BooleanLiteral(Span, bool),
     Call(Span, Rc<AST>, Vec<(Option<String>, Rc<AST>)>),
     Divide(Span, Rc<AST>, Rc<AST>),
@@ -55,6 +61,7 @@ pub enum AST {
         step: Option<Rc<AST>>,
         body: Rc<AST>,
     },
+    FieldAccess(Span, Rc<AST>, String),
     Comprehension(Span, String, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
     FormatStringLiteral(Span, Vec<String>, Vec<Rc<AST>>),
     Range(Span, Rc<AST>, Rc<AST>),
@@ -74,6 +81,7 @@ impl AST {
             AST::Block(span, ..) => span,
             AST::BooleanLiteral(span, ..) => span,
             AST::Call(span, ..) => span,
+            AST::Class {span, ..} => span,
             AST::Divide(span, ..) => span,
             AST::FloatLiteral(span, ..) => span,
             AST::Function { span, .. } => span,
@@ -103,6 +111,7 @@ impl AST {
             AST::Break(span, ..) => span,
             AST::ForEach(span, ..) => span,
             AST::For { span, .. } => span,
+            AST::FieldAccess(span, ..) => span,
             AST::Comprehension(span, ..) => span,
             AST::FormatStringLiteral(span, ..) => span,
             AST::Range(span, ..) => span,
@@ -132,6 +141,11 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, ")")
             }
+            AST::Class{name, ..} => write!(
+                f,
+                "<cls {}>",
+                name,
+            ),
             AST::Divide(_, lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
             AST::FloatLiteral(_, val) => write!(f, "{}", val),
             AST::Function { name, .. } => write!(
@@ -200,6 +214,7 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, ")")
             }
+            AST::FieldAccess(_, lhs, rhs) => write!(f, "{}.{}", lhs, rhs),
             AST::Comprehension(_, var, iter, expr, cond) => match cond {
                 Some(cond) => write!(f, "[{} for {} in {} if {}]", expr, var, iter, cond),
                 None => write!(f, "[{} for {} in {}]", expr, var, iter),
