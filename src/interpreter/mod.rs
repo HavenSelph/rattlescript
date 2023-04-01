@@ -99,6 +99,10 @@ impl Interpreter {
                 let mut last = None;
                 for stmt in stmts {
                     last = Some(self.run(stmt, scope.clone())?);
+                    match self.control_flow {
+                        ControlFlow::None => {}
+                        _ => break
+                    }
                 }
                 Ok(last.unwrap_or_else(|| Value::Nothing))
             }

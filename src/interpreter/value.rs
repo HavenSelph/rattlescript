@@ -362,11 +362,29 @@ impl Value {
     pub fn divide(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => {
+                if *right == 0 {
+                    error!(span, "Division by zero")
+                }
                 Value::Float(*left as f64 / *right as f64)
             }
-            (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 / *right),
-            (Value::Float(left), Value::Float(right)) => Value::Float(*left / *right),
-            (Value::Float(left), Value::Integer(right)) => Value::Float(*left / *right as f64),
+            (Value::Integer(left), Value::Float(right)) => {
+                if *right == 0.0 {
+                    error!(span, "Division by zero")
+                }
+                Value::Float(*left as f64 / *right)
+            },
+            (Value::Float(left), Value::Float(right)) => {
+                if *right == 0.0 {
+                    error!(span, "Division by zero")
+                }
+                Value::Float(*left / *right)
+            },
+            (Value::Float(left), Value::Integer(right)) => {
+                if *right == 0 {
+                    error!(span, "Division by zero")
+                }
+                Value::Float(*left / *right as f64)
+            },
             _ => error!(span, "Invalid types for division"),
         })
     }

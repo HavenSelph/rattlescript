@@ -147,6 +147,15 @@ impl Parser {
                         comma = false;
                     }
                 }
+                TokenKind::At => {
+                    self.increment();
+                    let deco = self.parse_postfix()?;
+                    self.consume_line_end()?;
+                    let (func, name) = self.parse_function()?;
+                    self.consume_line_end()?;
+                    let func = Rc::new(AST::Call(start.extend(deco.span()),deco,vec![(None, func)],));
+                    methods.push((name, func));
+                }
                 TokenKind::Def => {
                     let (func, name) = self.parse_function()?;
                     methods.push((name, func));
