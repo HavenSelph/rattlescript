@@ -217,6 +217,26 @@ impl Value {
         })
     }
 
+    pub fn modulo(&self, other: &Value, span: &Span) -> Result<Value> {
+        Ok(match (self, other) {
+            (Value::Integer(left), Value::Integer(right)) => Value::Integer(*left % *right),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 % *right),
+            (Value::Float(left), Value::Float(right)) => Value::Float(*left % *right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(*left % *right as f64),
+            _ => error!(span, "Invalid types for modulo"),
+        })
+    }
+
+    pub fn floor_divide(&self, other: &Value, span: &Span) -> Result<Value> {
+        Ok(match (self, other) {
+            (Value::Integer(left), Value::Integer(right)) => Value::Integer(*left / *right),
+            (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 / *right),
+            (Value::Float(left), Value::Float(right)) => Value::Float(*left / *right),
+            (Value::Float(left), Value::Integer(right)) => Value::Float(*left / *right as f64),
+            _ => error!(span, "Invalid types for floor division"),
+        })
+    }
+
     pub fn power(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => {
@@ -233,7 +253,7 @@ impl Value {
 
     pub fn divide(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
-            (Value::Integer(left), Value::Integer(right)) => Value::Integer(*left / *right),
+            (Value::Integer(left), Value::Integer(right)) => Value::Float(*left as f64 / *right as f64),
             (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 / *right),
             (Value::Float(left), Value::Float(right)) => Value::Float(*left / *right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left / *right as f64),

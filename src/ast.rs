@@ -16,6 +16,8 @@ pub enum AST {
     BooleanLiteral(Span, bool),
     Call(Span, Rc<AST>, Vec<(Option<String>, Rc<AST>)>),
     Divide(Span, Rc<AST>, Rc<AST>),
+    FloorDivide(Span, Rc<AST>, Rc<AST>),
+    Modulo(Span, Rc<AST>, Rc<AST>),
     FloatLiteral(Span, f64),
     Function {
         span: Span,
@@ -90,6 +92,8 @@ impl AST {
             AST::IntegerLiteral(span, ..) => span,
             AST::Minus(span, ..) => span,
             AST::Multiply(span, ..) => span,
+            AST::Modulo(span, ..) => span,
+            AST::FloorDivide(span, ..) => span,
             AST::Power(span, ..) => span,
             AST::Not(span, ..) => span,
             AST::Nothing(span, ..) => span,
@@ -147,6 +151,8 @@ impl std::fmt::Display for AST {
                 name,
             ),
             AST::Divide(_, lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
+            AST::FloorDivide(_, lhs, rhs) => write!(f, "({} // {})", lhs, rhs),
+            AST::Modulo(_, lhs, rhs) => write!(f, "({} % {})", lhs, rhs),
             AST::FloatLiteral(_, val) => write!(f, "{}", val),
             AST::Function { name, .. } => write!(
                 f,

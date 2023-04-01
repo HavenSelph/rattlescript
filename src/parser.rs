@@ -603,7 +603,7 @@ impl Parser {
         let mut left = self.parse_prefix()?;
 
         while let Token {
-            kind: TokenKind::Star | TokenKind::StarStar | TokenKind::Slash,
+            kind: TokenKind::Star | TokenKind::StarStar | TokenKind::Slash | TokenKind::SlashSlash | TokenKind::Percent,
             ..
         } = self.cur()
         {
@@ -619,6 +619,12 @@ impl Parser {
                 }
                 TokenKind::Slash => {
                     Rc::new(AST::Divide(left.span().extend(right.span()), left, right))
+                }
+                TokenKind::SlashSlash => {
+                    Rc::new(AST::FloorDivide(left.span().extend(right.span()), left, right))
+                }
+                TokenKind::Percent => {
+                    Rc::new(AST::Modulo(left.span().extend(right.span()), left, right))
                 }
                 _ => unreachable!(),
             }
