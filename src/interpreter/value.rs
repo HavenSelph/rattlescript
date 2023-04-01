@@ -2,6 +2,7 @@ use crate::ast::AST;
 use crate::common::{get, make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::Scope;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -101,7 +102,36 @@ pub enum Value {
     Iterator(IteratorValue),
     Nothing,
     Range(i64, i64),
+    Dict(Ref<std::collections::HashMap<Value, Value>>),
     String(Ref<String>),
+}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Integer(num) => num.hash(state),
+            Value::Float(num) => num.to_bits().hash(state),
+            Value::String(string) => string.borrow().hash(state),
+            Value::Boolean(boolean) => boolean.hash(state),
+            Value::Nothing => 0.hash(state),
+            Value::Iterator(_) => 0.hash(state),
+            Value::Range(..) => 0.hash(state),
+            Value::BuiltInFunction(name) => {
+                name.borrow().hash(state);
+                "builtin".hash(state);
+            }
+            Value::Function(func) => func.as_ptr().hash(state),
+            Value::Class(class) => class.as_ptr().hash(state),
+            Value::ClassInstance(instance) => instance.as_ptr().hash(state),
+            Value::Array(array) => {
+                for item in array.borrow().iter() {
+                    item.hash(state);
+                }
+            }
+            Value::Tuple(tuple) => tuple.borrow().iter().for_each(|item| item.hash(state)),
+            Value::Dict(items) => items.borrow().iter().for_each(|item| item.hash(state)),
+        }
+    }
 }
 
 impl std::fmt::Debug for Value {
@@ -148,6 +178,16 @@ impl std::fmt::Debug for Value {
                 }
                 write!(f, ")")
             }
+            Value::Dict(dict, ..) => {
+                write!(f, "{{")?;
+                for (i, (key, value)) in dict.borrow().iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {}", key.repr(), value.repr())?;
+                }
+                write!(f, "}}")
+            }
         }
     }
 }
@@ -176,6 +216,9 @@ impl std::cmp::PartialEq for Value {
         }
     }
 }
+
+#[allow(unused_qualifications)]
+impl std::cmp::Eq for Value {}
 
 impl Value {
     pub fn plus(&self, other: &Value, span: &Span) -> Result<Value> {
@@ -429,6 +472,20 @@ impl Value {
                 s.push(')');
                 s
             }
+            Value::Dict(dict, ..) => {
+                let dict = dict.borrow();
+                let mut s = "{".to_string();
+                for (i, (k, v)) in dict.iter().enumerate() {
+                    if i > 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&k.repr());
+                    s.push_str(": ");
+                    s.push_str(&v.repr());
+                }
+                s.push('}');
+                s
+            }
         }
     }
 
@@ -455,6 +512,10 @@ impl Value {
                 Some(v) => v.clone(),
                 None => error!(span, "Index out of bounds"),
             },
+            (Value::Dict(dict, ..), key) => match dict.borrow().get(key) {
+                Some(v) => v.clone(),
+                None => error!(span, "Key not found"),
+            },
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
     }
@@ -470,6 +531,9 @@ impl Value {
                     }
                     None => error!(span, "Index out of bounds"),
                 }
+            }
+            (Value::Dict(dict, ..), key) => {
+                dict.borrow_mut().insert(key.clone(), value.clone());
             }
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         }

@@ -72,6 +72,7 @@ pub enum AST {
     PreIncrement(Span, Rc<AST>, i64),
     ArrayLiteral(Span, Vec<Rc<AST>>),
     TupleLiteral(Span, Vec<Rc<AST>>),
+    DictionaryLiteral(Span, Vec<(Rc<AST>, Rc<AST>)>),
 }
 
 impl AST {
@@ -83,7 +84,7 @@ impl AST {
             AST::Block(span, ..) => span,
             AST::BooleanLiteral(span, ..) => span,
             AST::Call(span, ..) => span,
-            AST::Class {span, ..} => span,
+            AST::Class { span, .. } => span,
             AST::Divide(span, ..) => span,
             AST::FloatLiteral(span, ..) => span,
             AST::Function { span, .. } => span,
@@ -123,6 +124,7 @@ impl AST {
             AST::PreIncrement(span, ..) => span,
             AST::ArrayLiteral(span, ..) => span,
             AST::TupleLiteral(span, ..) => span,
+            AST::DictionaryLiteral(span, ..) => span,
         }
     }
 }
@@ -145,11 +147,7 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, ")")
             }
-            AST::Class{name, ..} => write!(
-                f,
-                "<cls {}>",
-                name,
-            ),
+            AST::Class { name, .. } => write!(f, "<cls {}>", name,),
             AST::Divide(_, lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
             AST::FloorDivide(_, lhs, rhs) => write!(f, "({} // {})", lhs, rhs),
             AST::Modulo(_, lhs, rhs) => write!(f, "({} % {})", lhs, rhs),
@@ -264,6 +262,16 @@ impl std::fmt::Display for AST {
                     write!(f, ",")?;
                 }
                 write!(f, ")")
+            }
+            AST::DictionaryLiteral(_, items) => {
+                write!(f, "{{")?;
+                for (i, (key, value)) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {}", key, value)?;
+                }
+                write!(f, "}}")
             }
         }
     }

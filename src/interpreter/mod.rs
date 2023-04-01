@@ -202,7 +202,7 @@ impl Interpreter {
                 span,
                 name,
                 fields,
-                methods
+                methods,
             } => {
                 let class = Value::Class(make!(Class {
                     span: *span,
@@ -215,12 +215,17 @@ impl Interpreter {
                                 .map(|def| self.run(def, scope.clone()).unwrap())
                         ))
                         .collect(),
-                    methods: methods.iter().map(|(name, func)| {
-                        let func = self.run(func, scope.clone()).expect("function");
-                        (name.clone(), func)
-                    }).collect()
+                    methods: methods
+                        .iter()
+                        .map(|(name, func)| {
+                            let func = self.run(func, scope.clone()).expect("function");
+                            (name.clone(), func)
+                        })
+                        .collect()
                 }));
-                scope.borrow_mut().insert(name, class.clone(), false, span)?;
+                scope
+                    .borrow_mut()
+                    .insert(name, class.clone(), false, span)?;
                 class
             }
             AST::Slice {
@@ -449,6 +454,10 @@ impl Interpreter {
             AST::Index(span, left, right) => {
                 let left = self.run(left, scope.clone())?;
                 let right = self.run(right, scope)?;
+                // match left {
+                //     // Value::Dict
+                //     _ => left.index(&right, span)?,
+                // }
                 left.index(&right, span)?
             }
             AST::PostIncrement(span, expr, offset) => {
@@ -481,6 +490,15 @@ impl Interpreter {
                 .iter()
                 .map(|x| self.run(x, scope.clone()))
                 .collect::<Result<Vec<_>>>()?)),
+            AST::DictionaryLiteral(_, arr) => {
+                let mut map = HashMap::new();
+                for (key, value) in arr {
+                    let key = self.run(key, scope.clone())?;
+                    let value = self.run(value, scope.clone())?;
+                    map.insert(key, value);
+                }
+                Value::Dict(make!(map))
+            }
         })
     }
 

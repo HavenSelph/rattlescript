@@ -769,7 +769,7 @@ impl Parser {
                     val = Rc::new(AST::FieldAccess(
                         val.span().extend(&name.span),
                         val,
-                        name.text.clone()
+                        name.text.clone(),
                     ));
                 }
                 Token {
@@ -884,6 +884,34 @@ impl Parser {
                     let end = self.consume(TokenKind::RightBracket)?.span;
                     Ok(Rc::new(AST::ArrayLiteral(span.extend(&end), arr)))
                 }
+            }
+            Token {
+                kind: TokenKind::LeftBrace,
+                span,
+                ..
+            } => {
+                self.increment();
+                let mut items = vec![];
+                while self.cur().kind != TokenKind::RightBrace {
+                    let key = self.parse_expression()?;
+                    self.consume(TokenKind::Colon)?;
+                    let val = self.parse_expression()?;
+                    items.push((key, val));
+                    match self.cur().kind {
+                        TokenKind::Comma => self.increment(),
+                        TokenKind::RightBrace => {}
+                        TokenKind::EOF => {
+                            eof_error!(self.cur().span, "Expected `}}` or ',' but got EOF")
+                        }
+                        _ => error!(
+                            self.cur().span,
+                            "Expected `}}` or `,` but got {:?}",
+                            self.cur().kind
+                        ),
+                    }
+                }
+                let end = self.consume(TokenKind::RightBrace)?.span;
+                Ok(Rc::new(AST::DictionaryLiteral(span.extend(&end), items)))
             }
             Token {
                 kind: TokenKind::Pipe,
