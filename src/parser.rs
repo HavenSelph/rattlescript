@@ -65,6 +65,13 @@ impl Parser {
         Ok(())
     }
 
+    fn consume_line_end_until(&mut self, until: TokenKind) -> Result<()> {
+        if self.cur().kind == until {
+            return Ok(());
+        }
+        self.consume_line_end()
+    }
+
     pub fn parse(&mut self) -> Result<Rc<AST>> {
         let res = self.parse_block(/*global*/ true)?;
         self.consume(TokenKind::EOF)?;
@@ -74,9 +81,12 @@ impl Parser {
     fn parse_block(&mut self, global: bool) -> Result<Rc<AST>> {
         let mut span = self.cur().span;
         let mut statements = vec![];
-        if !global {
+        let until = if !global {
             self.consume(TokenKind::LeftBrace)?;
-        }
+            TokenKind::RightBrace
+        } else {
+            TokenKind::EOF
+        };
         loop {
             if !global && self.cur().kind == TokenKind::RightBrace {
                 span = span.extend(&self.cur().span);
@@ -87,13 +97,16 @@ impl Parser {
                 span = span.extend(&self.cur().span);
                 break;
             }
-            statements.push(self.parse_statement()?);
+            statements.push(self.parse_statement(until.clone())?);
+            while self.cur().kind == TokenKind::SemiColon {
+                self.increment();
+            }
         }
         Ok(Rc::new(AST::Block(span, statements)))
     }
 
     fn parse_class(&mut self) -> Result<(Rc<AST>, String)> {
-        let start = self.consume(TokenKind::Cls)?.span;
+        let start = self.consume(TokenKind::Class)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         let mut fields: Vec<(String, Option<Rc<AST>>)> = vec![];
         let mut methods: Vec<(String, Rc<AST>)> = vec![];
@@ -235,7 +248,7 @@ impl Parser {
         ))
     }
 
-    fn parse_statement(&mut self) -> Result<Rc<AST>> {
+    fn parse_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
         match self.cur() {
             Token {
                 kind: TokenKind::Let,
@@ -246,7 +259,7 @@ impl Parser {
                 let ident = self.consume(TokenKind::Identifier)?;
                 self.consume(TokenKind::Equals)?;
                 let expr = self.parse_expression()?;
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::VarDeclaration(
                     span.extend(expr.span()),
                     ident.text,
@@ -270,7 +283,7 @@ impl Parser {
                     } => {
                         self.increment();
                         let else_body = match self.cur().kind {
-                            TokenKind::If => self.parse_statement()?,
+                            TokenKind::If => self.parse_statement(until)?,
                             _ => self.parse_block(/*global*/ false)?,
                         };
                         Ok(Rc::new(AST::If(
@@ -280,11 +293,14 @@ impl Parser {
                             Some(else_body),
                         )))
                     }
-                    _ => Ok(Rc::new(AST::If(span, cond, body, None))),
+                    _ => {
+                        self.consume_line_end_until(until)?;
+                        Ok(Rc::new(AST::If(span, cond, body, None)))
+                    },
                 }
             }
             Token {
-                kind: TokenKind::Cls,
+                kind: TokenKind::Class,
                 ..
             } => Ok(self.parse_class()?.0),
             Token {
@@ -300,7 +316,7 @@ impl Parser {
                 let deco = self.parse_postfix()?;
                 self.consume_line_end()?;
                 let (func, name) = self.parse_function()?;
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::Assignment(
                     span.extend(deco.span()),
                     Rc::new(AST::Variable(span.extend(deco.span()), name)),
@@ -317,7 +333,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::Continue(span)))
             }
             Token {
@@ -326,7 +342,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::Break(span)))
             }
             Token {
@@ -352,7 +368,7 @@ impl Parser {
                     let init = if self.cur().kind == TokenKind::SemiColon {
                         None
                     } else {
-                        let init = Some(self.parse_statement()?);
+                        let init = Some(self.parse_statement(TokenKind::SemiColon)?);
                         // If we have consumed a semicolon, we need to go back one token
                         if self.tokens[self.current_index - 1].kind == TokenKind::SemiColon {
                             self.current_index -= 1;
@@ -401,7 +417,7 @@ impl Parser {
             } => {
                 self.increment();
                 let expr = self.parse_expression()?;
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::Return(span.extend(expr.span()), expr)))
             }
             Token {
@@ -417,12 +433,12 @@ impl Parser {
                     span.extend(&self.cur().span);
                     self.consume(TokenKind::StringLiteral)?;
                 }
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::Assert(span, cond)))
             }
             _ => {
                 let expr = self.parse_expression()?;
-                self.consume_line_end()?;
+                self.consume_line_end_until(until)?;
                 Ok(expr)
             }
         }
@@ -433,14 +449,14 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self) -> Result<Rc<AST>> {
-        let left = self.parse_comparison()?;
+        let left = self.parse_logical_or()?;
         match self.cur() {
             Token {
                 kind: TokenKind::Equals,
                 ..
             } => {
                 self.increment();
-                let right = self.parse_comparison()?;
+                let right = self.parse_logical_or()?;
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left,
@@ -452,7 +468,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                let right = self.parse_comparison()?;
+                let right = self.parse_logical_or()?;
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
@@ -464,7 +480,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                let right = self.parse_comparison()?;
+                let right = self.parse_logical_or()?;
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
@@ -476,7 +492,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                let right = self.parse_comparison()?;
+                let right = self.parse_logical_or()?;
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
@@ -488,7 +504,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                let right = self.parse_comparison()?;
+                let right = self.parse_logical_or()?;
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left.clone(),
@@ -499,8 +515,36 @@ impl Parser {
         }
     }
 
+    fn parse_logical_or(&mut self) -> Result<Rc<AST>> {
+        let mut left = self.parse_logical_and()?;
+        while let Token {
+            kind: TokenKind::Or,
+            ..
+        } = self.cur()
+        {
+            self.increment();
+            let right = self.parse_logical_and()?;
+            left = Rc::new(AST::Or(left.span().extend(right.span()), left, right));
+        }
+        Ok(left)
+    }
+
+    fn parse_logical_and(&mut self) -> Result<Rc<AST>> {
+        let mut left = self.parse_comparison()?;
+        while let Token {
+            kind: TokenKind::And,
+            ..
+        } = self.cur()
+        {
+            self.increment();
+            let right = self.parse_comparison()?;
+            left = Rc::new(AST::And(left.span().extend(right.span()), left, right));
+        }
+        Ok(left)
+    }
+
     fn parse_comparison(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_logical_or()?;
+        let mut left = self.parse_additive()?;
         while let Token {
             kind:
                 TokenKind::EqualsEquals
@@ -514,7 +558,7 @@ impl Parser {
         {
             let op = self.cur().kind;
             self.increment();
-            let right = self.parse_logical_or()?;
+            let right = self.parse_additive()?;
             left = match op {
                 TokenKind::EqualsEquals => {
                     Rc::new(AST::Equals(left.span().extend(right.span()), left, right))
@@ -544,34 +588,6 @@ impl Parser {
                 )),
                 _ => unreachable!(),
             }
-        }
-        Ok(left)
-    }
-
-    fn parse_logical_or(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_logical_and()?;
-        while let Token {
-            kind: TokenKind::Or,
-            ..
-        } = self.cur()
-        {
-            self.increment();
-            let right = self.parse_logical_and()?;
-            left = Rc::new(AST::Or(left.span().extend(right.span()), left, right));
-        }
-        Ok(left)
-    }
-
-    fn parse_logical_and(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_additive()?;
-        while let Token {
-            kind: TokenKind::And,
-            ..
-        } = self.cur()
-        {
-            self.increment();
-            let right = self.parse_additive()?;
-            left = Rc::new(AST::And(left.span().extend(right.span()), left, right));
         }
         Ok(left)
     }
@@ -648,6 +664,12 @@ impl Parser {
 
     fn parse_prefix(&mut self) -> Result<Rc<AST>> {
         match self.cur().kind {
+            TokenKind::Minus => {
+                let start = self.cur().span;
+                self.increment();
+                let expr = self.parse_prefix()?;
+                Ok(Rc::new(AST::Negate(start.extend(expr.span()), expr)))
+            }
             TokenKind::Not => {
                 let start = self.cur().span;
                 self.increment();

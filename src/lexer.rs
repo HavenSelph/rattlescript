@@ -32,6 +32,13 @@ impl Lexer {
         self.input.chars().nth(self.current_index + offset)
     }
 
+    // fn peek_is(&self, s: &str) -> bool {
+    //     if self.current_index + s.len() > self.input.len() {
+    //         return false;
+    //     }
+    //     &self.input[self.current_index..self.current_index + s.len()] == s
+    // }
+
     fn increment(&mut self) {
         match self.cur() {
             Some('\n') => {
@@ -182,7 +189,9 @@ impl Lexer {
                 ',' => self.push_simple(&mut tokens, TokenKind::Comma, 1),
                 '{' => self.push_simple(&mut tokens, TokenKind::LeftBrace, 1),
                 '}' => self.push_simple(&mut tokens, TokenKind::RightBrace, 1),
-                '@' => self.push_simple(&mut tokens, TokenKind::At, 1),
+                '@' => {
+                    self.push_simple(&mut tokens, TokenKind::At, 1)
+                },
                 '"' | '`' => {
                     let token = self.lex_string_literal()?;
                     self.push(&mut tokens, token);
@@ -204,7 +213,13 @@ impl Lexer {
                             _ => break,
                         }
                     }
-                    self.push(&mut tokens, Token::from_str(ident, Span(start, self.loc())));
+                    match ident.as_str() {
+                        "elif" => {
+                            self.push(&mut tokens, Token::new(TokenKind::Else, Span(start, self.loc()), ident.clone()));
+                            self.push(&mut tokens, Token::new(TokenKind::If, Span(start, self.loc()), ident));
+                        }
+                        _ => self.push(&mut tokens, Token::from_str(ident, Span(start, self.loc()))),
+                    }
                 }
                 _ => error!(Span(start, self.loc()), "Unexpected character {}", c),
             }
@@ -231,6 +246,21 @@ impl Lexer {
                         Span(start, self.loc()),
                         string,
                     ));
+                }
+                '\\' => {
+                    self.increment();
+                    match self.cur() {
+                        Some('\\') => string.push('\\'),
+                        Some(c) if (c == quote) => string.push(quote),
+                        Some('n') => string.push('\n'),
+                        Some('r') => string.push('\r'),
+                        Some('t') => string.push('\t'),
+                        Some('0') => string.push('\0'),
+                        Some('{') => string.push_str("\\{"),
+                        Some('}') => string.push_str("\\}"),
+                        _ => error!(Span(start, self.loc()), "Invalid escape sequence"),
+                    }
+                    self.increment();
                 }
                 '\n' => break,
                 _ => {

@@ -90,7 +90,7 @@ impl Error {
         let end = self.span.1;
 
         let min_line = if start.line <= context {
-            1
+            0
         } else {
             start.line - context - 1
         };
@@ -123,7 +123,7 @@ impl Error {
                 let text_after = &line[highlight_end..];
                 println!(
                     "│ {:>3} │ {}\x1b[0;31m{}\x1b[0m{}",
-                    line_no, text_before, text_highlight, text_after
+                    line_no+1, text_before, text_highlight, text_after
                 );
 
                 if start.line == end.line {
@@ -141,7 +141,7 @@ impl Error {
                     }
                 }
             } else {
-                println!("│ {:>3} │ {}", line_no, line);
+                println!("│ {:>3} │ {}", line_no+1, line);
             }
         }
 

@@ -77,7 +77,7 @@ macro_rules! builtins {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let builtins = builtins!(print, repr, len, exit, input);
+        let builtins = builtins!(print, repr, len, exit, input, read_file, to_int, to_float, to_str);
         Self {
             builtins,
             control_flow: ControlFlow::None,
@@ -137,6 +137,7 @@ impl Interpreter {
                 dispatch_op!(loc, Value::floor_divide, left, right)
             }
 
+            AST::Negate(loc, expr) => dispatch_op!(loc, Value::negate, expr),
             AST::Not(loc, expr) => dispatch_op!(loc, Value::not, expr),
             AST::And(loc, left, right) => dispatch_op!(loc, Value::and, left, right),
             AST::Or(loc, left, right) => dispatch_op!(loc, Value::or, left, right),
@@ -164,6 +165,9 @@ impl Interpreter {
                 span,
                 ..
             } => {
+                for (name, _) in args {
+                    self.check_arg_name(name, span)?;
+                }
                 let func = Value::Function(make!(Function {
                     span: *span,
                     name: name.clone().unwrap_or_else(|| "<anon>".to_string()),
@@ -207,6 +211,9 @@ impl Interpreter {
                 fields,
                 methods,
             } => {
+                for (name, _) in fields {
+                    self.check_arg_name(name, span)?;
+                }
                 let class = Value::Class(make!(Class {
                     span: *span,
                     name: name.clone(),
@@ -280,17 +287,12 @@ impl Interpreter {
                 value
             }
             AST::VarDeclaration(span, name, value) => {
-                if self.builtins.contains_key(name.as_str()) {
-                    error!(
-                        span,
-                        "`{}` is a built-in function, can't be used as a variable", name
-                    )
-                }
+                self.check_arg_name(name, span)?;
                 let value = self.run(value, scope.clone())?;
                 scope
                     .borrow_mut()
                     .insert(name, value.clone(), false, span)?;
-                value
+                Value::Nothing
             }
             AST::Assert(loc, cond) => {
                 let cond = self.run(cond, scope)?;
@@ -335,6 +337,7 @@ impl Interpreter {
                 Value::Nothing
             }
             AST::ForEach(span, loop_var, iter, body) => {
+                self.check_arg_name(loop_var, span)?;
                 let val = self.run(iter, scope.clone())?;
                 let iter = val.iterator(span)?;
                 match iter {
@@ -496,7 +499,11 @@ impl Interpreter {
             AST::DictionaryLiteral(_, arr) => {
                 let mut map = HashMap::new();
                 for (key, value) in arr {
+                    let span = key.span();
                     let key = self.run(key, scope.clone())?;
+                    if !key.is_hashable() {
+                        error!(span, "Dictionary key must be hashable")
+                    }
                     let value = self.run(value, scope.clone())?;
                     map.insert(key, value);
                 }
@@ -536,6 +543,16 @@ impl Interpreter {
             _ => error!(span, "Invalid assignment target"),
         }
         Ok(())
+    }
+
+    fn check_arg_name(&self, name: &str, span: &Span) -> Result<()>{
+        if name == "self" {
+            error!(span, "Argument name can't be `self`")
+        } else if self.builtins.contains_key(name) {
+            error!(span, "Argument name can't be a built-in function name")
+        } else {
+            Ok(())
+        }
     }
 
     fn handle_call(

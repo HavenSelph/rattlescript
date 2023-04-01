@@ -48,6 +48,26 @@ impl Iterator for ArrayIterator {
     }
 }
 
+struct DictIterator {
+    dict: Ref<std::collections::HashMap<Value, Value>>,
+    index: usize,
+}
+
+impl Iterator for DictIterator {
+    type Item = Value;
+
+    fn next(&mut self) -> Option<Value> {
+        let dict = self.dict.borrow();
+        if self.index >= dict.len() {
+            None
+        } else {
+            let (key, _) = dict.iter().nth(self.index).unwrap();
+            self.index += 1;
+            Some(key.clone())
+        }
+    }
+}
+
 impl IteratorValue {
     pub fn for_string(string: Ref<String>) -> IteratorValue {
         IteratorValue(make!(StringIterator { string, index: 0 }))
@@ -59,6 +79,10 @@ impl IteratorValue {
 
     pub fn for_array(array: Ref<Vec<Value>>) -> IteratorValue {
         IteratorValue(make!(ArrayIterator { array, index: 0 }))
+    }
+
+    pub fn for_dict(dict: Ref<std::collections::HashMap<Value, Value>>) -> IteratorValue {
+        IteratorValue(make!(DictIterator { dict, index: 0 }))
     }
 }
 
@@ -115,11 +139,11 @@ impl Hash for Value {
             Value::Boolean(boolean) => boolean.hash(state),
             Value::Nothing => 0.hash(state),
             Value::Iterator(_) => 0.hash(state),
-            Value::Range(..) => 0.hash(state),
-            Value::BuiltInFunction(name) => {
-                name.borrow().hash(state);
-                "builtin".hash(state);
+            Value::Range(start, end) => {
+                start.hash(state);
+                end.hash(state);
             }
+            Value::BuiltInFunction(name) => name.borrow().hash(state),
             Value::Function(func) => func.as_ptr().hash(state),
             Value::Class(class) => class.as_ptr().hash(state),
             Value::ClassInstance(instance) => instance.as_ptr().hash(state),
@@ -195,6 +219,13 @@ impl std::fmt::Debug for Value {
 #[allow(unused_qualifications)]
 impl std::cmp::PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
+        //     Class(Ref<Class>),
+        //     ClassInstance(Ref<ClassInstance>),
+        //     Function(Ref<Function>),
+        //     Iterator(IteratorValue),
+        //     Nothing,
+        //     Range(i64, i64),
+        //     Dict(Ref<std::collections::HashMap<Value, Value>>),
         match (self, other) {
             (Value::Integer(left), Value::Integer(right)) => *left == *right,
             (Value::Integer(left), Value::Float(right)) => *left as f64 == *right,
@@ -210,6 +241,34 @@ impl std::cmp::PartialEq for Value {
                     false
                 } else {
                     left.iter().zip(right.iter()).all(|(a, b)| a == b)
+                }
+            }
+            (Value::BuiltInFunction(left), Value::BuiltInFunction(right)) => {
+                left.borrow().as_str() == right.borrow().as_str()
+            }
+            (Value::Class(left), Value::Class(right)) => left.as_ptr() == right.as_ptr(),
+            (Value::ClassInstance(left), Value::ClassInstance(right)) => {
+                left.as_ptr() == right.as_ptr()
+            }
+            (Value::Function(left), Value::Function(right)) => left.as_ptr() == right.as_ptr(),
+            (Value::Iterator(..), Value::Iterator(..)) => false,
+            (Value::Range(left_start, left_end), Value::Range(right_start, right_end)) => {
+                left_start == right_start && left_end == right_end
+            }
+            (Value::Nothing, Value::Nothing) => true,
+            (Value::Dict(left, ..), Value::Dict(right, ..)) => {
+                let left = left.borrow();
+                let right = right.borrow();
+                if left.len() != right.len() {
+                    false
+                } else {
+                    left.iter().all(|(key, value)| {
+                        if let Some(other_value) = right.get(key) {
+                            value == other_value
+                        } else {
+                            false
+                        }
+                    })
                 }
             }
             _ => false,
@@ -229,6 +288,12 @@ impl Value {
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left + *right as f64),
             (Value::String(left), Value::String(right)) => {
                 Value::String(make!(left.borrow().clone() + get!(right)))
+            }
+            (Value::Array(left), Value::Array(right)) => {
+                let mut left = left.borrow().clone();
+                let right = right.borrow();
+                left.extend(right.iter().cloned());
+                Value::Array(make!(left))
             }
             _ => error!(span, "Invalid types for addition"),
         })
@@ -358,6 +423,14 @@ impl Value {
         }
     }
 
+    pub fn negate(&self, span: &Span) -> Result<Value> {
+        Ok(match self {
+            Value::Integer(i) => Value::Integer(-*i),
+            Value::Float(f) => Value::Float(-*f),
+            _ => error!(span, "Invalid type for negation"),
+        })
+    }
+
     pub fn not(&self, span: &Span) -> Result<Value> {
         Ok(match self {
             Value::Boolean(b) => Value::Boolean(!*b),
@@ -420,6 +493,7 @@ impl Value {
             Value::Array(arr) | Value::Tuple(arr) => {
                 Value::Iterator(IteratorValue::for_array(arr.clone()))
             }
+            Value::Dict(dict) => Value::Iterator(IteratorValue::for_dict(dict.clone())),
             _ => error!(span, "Cannot iterate over this type"),
         })
     }
@@ -429,7 +503,7 @@ impl Value {
         match self {
             Value::Integer(i) => i.to_string(),
             Value::Float(f) => f.to_string(),
-            Value::String(s) => format!("\"{}\"", s.borrow()),
+            Value::String(s) => escape_string(s.borrow().as_str()),
             Value::Boolean(b) => b.to_string(),
             Value::Iterator(_) => "<iterator>".to_string(),
             Value::Function(func) => {
@@ -442,7 +516,7 @@ impl Value {
             }
             Value::ClassInstance(inst) => {
                 let inst = inst.borrow();
-                format!("<instance of cls {}>", inst.class.borrow().name)
+                format!("<instance of class {}>", inst.class.borrow().name)
             }
             Value::Range(start, end) => format!("{}..{}", start, end),
             Value::BuiltInFunction(name) => format!("<built-in function {}>", name.borrow()),
@@ -514,9 +588,14 @@ impl Value {
                 Some(v) => v.clone(),
                 None => error!(span, "Index out of bounds"),
             },
-            (Value::Dict(dict, ..), key) => match dict.borrow().get(key) {
-                Some(v) => v.clone(),
-                None => error!(span, "Key not found"),
+            (Value::Dict(dict, ..), key) => {
+                if !key.is_hashable() {
+                    error!(span, "Key must be hashable");
+                }
+                match dict.borrow().get(key) {
+                    Some(v) => v.clone(),
+                    None => error!(span, "Key not found"),
+                }
             },
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
@@ -535,6 +614,9 @@ impl Value {
                 }
             }
             (Value::Dict(dict, ..), key) => {
+                if !key.is_hashable() {
+                    error!(span, "Key must be hashable");
+                }
                 dict.borrow_mut().insert(key.clone(), value.clone());
             }
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
@@ -552,4 +634,36 @@ impl Value {
         }
         Ok(())
     }
+
+    pub fn is_hashable(&self) -> bool {
+        matches!(
+            self,
+            Value::Integer(_)
+                | Value::Float(_)
+                | Value::String(_)
+                | Value::Boolean(_)
+                | Value::Tuple(_)
+                | Value::Function(_)
+                | Value::BuiltInFunction(_)
+                | Value::Class(_)
+                | Value::Range(..)
+                | Value::Nothing,
+        )
+    }
+}
+
+fn escape_string(s: &str) -> String {
+    let mut escaped = String::from('"');
+    for c in s.chars() {
+        match c {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            c => escaped.push(c),
+        }
+    }
+    escaped.push('"');
+    escaped
 }
