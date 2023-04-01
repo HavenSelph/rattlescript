@@ -296,7 +296,9 @@ impl Value {
 
     pub fn divide(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
-            (Value::Integer(left), Value::Integer(right)) => Value::Float(*left as f64 / *right as f64),
+            (Value::Integer(left), Value::Integer(right)) => {
+                Value::Float(*left as f64 / *right as f64)
+            }
             (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 / *right),
             (Value::Float(left), Value::Float(right)) => Value::Float(*left / *right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left / *right as f64),

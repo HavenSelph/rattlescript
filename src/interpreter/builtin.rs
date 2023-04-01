@@ -54,7 +54,7 @@ pub fn input(span: &Span, args: Vec<Value>) -> Result<Value> {
             Value::String(string) => string.borrow().clone(),
             _ => error!(span, "input() may only take a string as argument"),
         }
-    } else if args.len() == 0 {
+    } else if args.is_empty() {
         String::new()
     } else {
         error!(span, "input() takes either one or no arguments");

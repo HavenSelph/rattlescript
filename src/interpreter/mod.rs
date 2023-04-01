@@ -133,7 +133,9 @@ impl Interpreter {
             AST::Power(loc, left, right) => dispatch_op!(loc, Value::power, left, right),
             AST::Divide(loc, left, right) => dispatch_op!(loc, Value::divide, left, right),
             AST::Modulo(loc, left, right) => dispatch_op!(loc, Value::modulo, left, right),
-            AST::FloorDivide(loc, left, right) => dispatch_op!(loc, Value::floor_divide, left, right),
+            AST::FloorDivide(loc, left, right) => {
+                dispatch_op!(loc, Value::floor_divide, left, right)
+            }
 
             AST::Not(loc, expr) => dispatch_op!(loc, Value::not, expr),
             AST::And(loc, left, right) => dispatch_op!(loc, Value::and, left, right),
@@ -185,16 +187,17 @@ impl Interpreter {
             AST::FieldAccess(span, obj, field) => {
                 let obj = self.run(obj, scope)?;
                 match obj {
-                    Value::ClassInstance(instance) => {
-                        match instance.borrow().fields.get(field) {
-                            Some(val) => val.clone(),
-                            None => {
-                                error!(span, "Field '{}' not found on class instance", field);
-                            }
+                    Value::ClassInstance(instance) => match instance.borrow().fields.get(field) {
+                        Some(val) => val.clone(),
+                        None => {
+                            error!(span, "Field '{}' not found on class instance", field);
                         }
-                    }
+                    },
                     _ => {
-                        error!(span, "Cannot access field '{}' on non-class instance", field);
+                        error!(
+                            span,
+                            "Cannot access field '{}' on non-class instance", field
+                        );
                     }
                 }
             }
@@ -621,27 +624,30 @@ impl Interpreter {
                     .map(|(_, arg)| self.run(arg, scope.clone()))
                     .collect::<Result<Vec<_>>>()?;
                 if args.len() > _class.fields.len() {
-                    error!(span, "Class expected no more than {:?} arguments, got {:?}", _class.fields.len(), args.len());
+                    error!(
+                        span,
+                        "Class expected no more than {:?} arguments, got {:?}",
+                        _class.fields.len(),
+                        args.len()
+                    );
                 }
                 for (i, (name, default)) in _class.fields.iter().enumerate() {
                     if i < args.len() {
                         let arg = &args[i];
                         fields.insert(name.clone(), arg.clone());
-                    }
-                    else if let Some(default) = default {
+                    } else if let Some(default) = default {
                         fields.insert(name.clone(), default.clone());
-                    }
-                    else {
-                        error!(span, "Class argument {} is required, but not provided", name);
+                    } else {
+                        error!(
+                            span,
+                            "Class argument {} is required, but not provided", name
+                        );
                     }
                 }
-                let instance = Value::ClassInstance(
-                    make!(ClassInstance {
-                        class: class.clone(),
-                        fields
-                    }),
-                );
-                instance
+                Value::ClassInstance(make!(ClassInstance {
+                    class: class.clone(),
+                    fields
+                }))
             }
             x => error!(span, "Can't call object {:?}", x),
         });
