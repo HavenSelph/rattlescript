@@ -1,7 +1,7 @@
-use std::io::{Read,Write};
 use crate::common::{make, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::Value;
+use std::io::{Read, Write};
 
 pub fn print(_span: &Span, args: Vec<Value>) -> Result<Value> {
     for (i, arg) in args.iter().enumerate() {
@@ -63,7 +63,6 @@ pub fn pop(span: &Span, args: Vec<Value>) -> Result<Value> {
         other => error!(span, "pop() does not support {:?}", other),
     }
 }
-
 
 pub fn exit(span: &Span, args: Vec<Value>) -> Result<Value> {
     let code = match args.get(0) {
@@ -188,7 +187,10 @@ pub fn join(span: &Span, args: Vec<Value>) -> Result<Value> {
     }
     let iter = match &args[0] {
         Value::Iterator(iter) => iter,
-        _ => error!(span, "join() may only take an iterable as the first argument"),
+        _ => error!(
+            span,
+            "join() may only take an iterable as the first argument"
+        ),
     };
 
     let separator = match args.get(1) {

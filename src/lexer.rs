@@ -189,9 +189,7 @@ impl Lexer {
                 ',' => self.push_simple(&mut tokens, TokenKind::Comma, 1),
                 '{' => self.push_simple(&mut tokens, TokenKind::LeftBrace, 1),
                 '}' => self.push_simple(&mut tokens, TokenKind::RightBrace, 1),
-                '@' => {
-                    self.push_simple(&mut tokens, TokenKind::At, 1)
-                },
+                '@' => self.push_simple(&mut tokens, TokenKind::At, 1),
                 '"' | '`' => {
                     let token = self.lex_string_literal()?;
                     self.push(&mut tokens, token);
@@ -215,10 +213,18 @@ impl Lexer {
                     }
                     match ident.as_str() {
                         "elif" => {
-                            self.push(&mut tokens, Token::new(TokenKind::Else, Span(start, self.loc()), ident.clone()));
-                            self.push(&mut tokens, Token::new(TokenKind::If, Span(start, self.loc()), ident));
+                            self.push(
+                                &mut tokens,
+                                Token::new(TokenKind::Else, Span(start, self.loc()), ident.clone()),
+                            );
+                            self.push(
+                                &mut tokens,
+                                Token::new(TokenKind::If, Span(start, self.loc()), ident),
+                            );
                         }
-                        _ => self.push(&mut tokens, Token::from_str(ident, Span(start, self.loc()))),
+                        _ => {
+                            self.push(&mut tokens, Token::from_str(ident, Span(start, self.loc())))
+                        }
                     }
                 }
                 _ => error!(Span(start, self.loc()), "Unexpected character {}", c),

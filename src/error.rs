@@ -123,7 +123,10 @@ impl Error {
                 let text_after = &line[highlight_end..];
                 println!(
                     "│ {:>3} │ {}\x1b[0;31m{}\x1b[0m{}",
-                    line_no+1, text_before, text_highlight, text_after
+                    line_no + 1,
+                    text_before,
+                    text_highlight,
+                    text_after
                 );
 
                 if start.line == end.line {
@@ -141,7 +144,7 @@ impl Error {
                     }
                 }
             } else {
-                println!("│ {:>3} │ {}", line_no+1, line);
+                println!("│ {:>3} │ {}", line_no + 1, line);
             }
         }
 
