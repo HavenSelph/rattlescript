@@ -1,7 +1,7 @@
 use crate::ast::AST;
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::{Class, ClassInstance, Function, IteratorValue, Value};
+use crate::interpreter::value::{Class, ClassInstance, Function, IteratorValue, Value, builtin};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -57,29 +57,14 @@ enum ControlFlow {
     Return(Value),
 }
 
-type BuiltInFunctionType = fn(&Span, Vec<Value>) -> Result<Value>;
 
 pub struct Interpreter {
-    builtins: HashMap<&'static str, BuiltInFunctionType>,
     control_flow: ControlFlow,
-}
-
-macro_rules! builtins {
-    ($($name:ident),+ $(,)?) => {
-        HashMap::from([$(
-            (
-                stringify!($name),
-                builtin::$name as BuiltInFunctionType,
-            ),
-        )+])
-    };
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        let builtins = builtins!(print, repr, len, exit, input, read_file, to_int, to_float, to_str);
         Self {
-            builtins,
             control_flow: ControlFlow::None,
         }
     }
@@ -201,6 +186,94 @@ impl Interpreter {
                             error!(span, "Field '{}' not found on class instance", field);
                         }
                     },
+                    Value::Array(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "push" => builtin!(push),
+                        "pop" => builtin!(pop),
+                        "str" => builtin!(to_str),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on array", field);
+                        }
+                    },
+                    Value::Tuple(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "str" => builtin!(to_str),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on tuple", field);
+                        }
+                    },
+                    Value::Float(_) => match field.as_str() {
+                        "int" => builtin!(to_int),
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on float", field);
+                        }
+                    },
+                    Value::Boolean(_) => match field.as_str() {
+                        "int" => builtin!(to_int),
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on boolean", field);
+                        }
+                    },
+                    Value::Integer(_) => match field.as_str() {
+                        "str" => builtin!(to_str),
+                        "float" => builtin!(to_float),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on integer", field);
+                        }
+                    },
+                    Value::String(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "split" => builtin!(split),
+                        "int" => builtin!(to_int),
+                        "float" => builtin!(to_float),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on string", field);
+                        }
+                    },
+                    Value::Dict(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "str" => builtin!(to_str),
+                        "get" => builtin!(dict_get),
+                        "keys" => builtin!(dict_keys),
+                        "values" => builtin!(dict_values),
+                        "items" => builtin!(dict_items),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on dict", field);
+                        }
+                    },
+                    Value::Iterator(_) => match field.as_str() {
+                        "join" => builtin!(join),
+                        "enumerate" => builtin!(iter_enumerate),
+                        _ => {
+                            error!(span, "Field '{}' not found on iterator", field);
+                        }
+                    },
+                    Value::File(_) => match field.as_str() {
+                        "read" => builtin!(file_read),
+                        "write" => builtin!(file_write),
+                        _ => {
+                            error!(span, "Field '{}' not found on file", field);
+                        }
+                    },
+                    Value::Nothing => match field.as_str() {
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on nothing", field);
+                        }
+                    },
                     _ => {
                         error!(
                             span,
@@ -270,12 +343,22 @@ impl Interpreter {
                 self.run_block_without_new_scope(ast, block_scope)?
             }
             AST::Variable(span, name) => {
-                if self.builtins.get(name.as_str()).is_some() {
-                    Value::BuiltInFunction(make!(name.clone()))
-                } else if let Some(value) = scope.borrow_mut().get(name) {
-                    value
-                } else {
-                    error!(span, "Variable {} not found", name)
+                match name.as_str() {
+                    "len" => builtin!(len),
+                    "print" => builtin!(print),
+                    "input" => builtin!(input),
+                    "str" => builtin!(to_str),
+                    "repr" => builtin!(repr),
+                    "open" => builtin!(file_open),
+                    "exit" => builtin!(exit),
+                    _ => {
+                        match scope.borrow().get(name) {
+                            Some(val) => val.clone(),
+                            None => {
+                                error!(span, "Variable '{}' not found", name);
+                            }
+                        }
+                    }
                 }
             }
             AST::Return(span, val) => {
@@ -528,9 +611,9 @@ impl Interpreter {
                 if scope.borrow_mut().get(name.as_str()).is_none() {
                     error!(span, "Variable {} doesn't exist", name)
                 }
-                if self.builtins.contains_key(name.as_str()) {
-                    error!(span, "`{}` is a built-in function, can't override it", name)
-                }
+                // if self.builtins.contains_key(name.as_str()) {
+                //     error!(span, "`{}` is a built-in function, can't override it", name)
+                // }
                 scope
                     .borrow_mut()
                     .insert(name.as_str(), value, true, span)?;
@@ -552,8 +635,8 @@ impl Interpreter {
     fn check_arg_name(&self, name: &str, span: &Span) -> Result<()>{
         if name == "self" {
             error!(span, "Argument name can't be `self`")
-        } else if self.builtins.contains_key(name) {
-            error!(span, "Argument name can't be a built-in function name")
+        // } else if self.builtins.contains_key(name) {
+        //     error!(span, "Argument name can't be a built-in function name")
         } else {
             Ok(())
         }
@@ -625,14 +708,15 @@ impl Interpreter {
                 value
             }
             Value::BuiltInFunction(func) => {
-                let args = args
+                let mut args = args
                     .iter()
                     .map(|(_, arg)| self.run(arg, scope.clone()))
                     .collect::<Result<Vec<_>>>()?;
-                match self.builtins.get(func.borrow().as_str()) {
-                    Some(func) => func(span, args)?,
-                    None => error!(span, "Built-in function {} not found", func.borrow()),
+                if let Some(parent) = parent {
+                    let parent = self.run(parent, scope.clone())?;
+                    args.insert(0, parent);
                 }
+                func.1.borrow()(span, args)?
             }
             Value::Class(class) => {
                 let _class = class.borrow();
