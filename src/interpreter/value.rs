@@ -674,11 +674,11 @@ fn escape_string(s: &str) -> String {
     let mut escaped = String::from('"');
     for c in s.chars() {
         match c {
-            '"' => escaped.push_str("\\\""),
-            '\\' => escaped.push_str("\\\\"),
-            '\n' => escaped.push_str("\\n"),
-            '\r' => escaped.push_str("\\r"),
-            '\t' => escaped.push_str("\\t"),
+            '"' => escaped.push_str("\""),
+            '\\' => escaped.push_str("\\"),
+            '\n' => escaped.push_str("\n"),
+            '\r' => escaped.push_str("\r"),
+            '\t' => escaped.push_str("\t"),
             c => escaped.push(c),
         }
     }

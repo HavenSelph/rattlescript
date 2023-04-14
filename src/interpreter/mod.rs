@@ -201,6 +201,113 @@ impl Interpreter {
                             error!(span, "Field '{}' not found on class instance", field);
                         }
                     },
+                    Value::Array(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "push" => builtin!(push),
+                        "pop" => builtin!(pop),
+                        "str" => builtin!(to_str),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on array", field);
+                        }
+                    },
+                    Value::Tuple(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "str" => builtin!(to_str),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on tuple", field);
+                        }
+                    },
+                    Value::Float(_) => match field.as_str() {
+                        "int" => builtin!(to_int),
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on float", field);
+                        }
+                    },
+                    Value::Boolean(_) => match field.as_str() {
+                        "int" => builtin!(to_int),
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on boolean", field);
+                        }
+                    },
+                    Value::Integer(_) => match field.as_str() {
+                        "str" => builtin!(to_str),
+                        "float" => builtin!(to_float),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on integer", field);
+                        }
+                    },
+                    Value::String(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "split" => builtin!(split),
+                        "int" => builtin!(to_int),
+                        "float" => builtin!(to_float),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on string", field);
+                        }
+                    },
+                    Value::Dict(_) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "str" => builtin!(to_str),
+                        "get" => builtin!(dict_get),
+                        "keys" => builtin!(dict_keys),
+                        "values" => builtin!(dict_values),
+                        "items" => builtin!(dict_items),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on dict", field);
+                        }
+                    },
+                    Value::Iterator(_) => match field.as_str() {
+                        "join" => builtin!(join),
+                        "array" => builtin!(to_array),
+                        "enumerate" => builtin!(iter_enumerate),
+                        _ => {
+                            error!(span, "Field '{}' not found on iterator", field);
+                        }
+                    },
+                    Value::Range(..) => match field.as_str() {
+                        "len" => builtin!(len),
+                        "iter" => builtin!(to_iter),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on range", field);
+                        }
+                    },
+                    Value::File(_) => match field.as_str() {
+                        "read" => builtin!(file_read),
+                        "write" => builtin!(file_write),
+                        _ => {
+                            error!(span, "Field '{}' not found on file", field);
+                        }
+                    },
+                    Value::Function(_) | Value::BuiltInFunction(..) => match field.as_str() {
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        "name" => builtin!(func_name),
+                        "args" => builtin!(func_args),
+                        "location" => builtin!(func_location),
+                        _ => {
+                            error!(span, "Field '{}' not found on function", field);
+                        }
+                    },
+                    Value::Nothing => match field.as_str() {
+                        "str" => builtin!(to_str),
+                        "dbg" => builtin!(debug),
+                        _ => {
+                            error!(span, "Field '{}' not found on nothing", field);
+                        }
+                    },
                     _ => {
                         error!(
                             span,
@@ -270,15 +377,27 @@ impl Interpreter {
                 let block_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
                 self.run_block_without_new_scope(ast, block_scope)?
             }
-            AST::Variable(span, name) => {
-                if self.builtins.get(name.as_str()).is_some() {
-                    Value::BuiltInFunction(make!(name.clone()))
-                } else if let Some(value) = scope.borrow_mut().get(name) {
-                    value
-                } else {
-                    error!(span, "Variable {} not found", name)
-                }
-            }
+
+            AST::Variable(span, name) => match name.as_str() {
+                "len" => builtin!(len),
+                "print" => builtin!(print),
+                "sleep" => builtin!(time_sleep),
+                "time" => builtin!(time_now),
+                "input" => builtin!(input),
+                "str" => builtin!(to_str),
+                "repr" => builtin!(repr),
+                "open" => builtin!(file_open),
+                "rand" => builtin!(random),
+                "randint" => builtin!(random_int),
+                "rand_choice" => builtin!(random_choice),
+                "exit" => builtin!(exit),
+                _ => match scope.borrow().get(name) {
+                    Some(val) => val,
+                    None => {
+                        error!(span, "Variable '{}' not found", name);
+                    }
+                },
+            },
             AST::Return(span, val) => {
                 if !scope.borrow_mut().in_function {
                     error!(span, "Return statement outside of function")
