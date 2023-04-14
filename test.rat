@@ -47,7 +47,7 @@ if boo {
     print("boo is false, and not_boo is false")
 }
 
-let boo_lam || => true
+let boo_lam = || => true
 
 if boo_lam() {
     print("boo_lam is true")
@@ -84,7 +84,7 @@ for x in 0..5 {
 }
 print("repr of this")
 
-//print("hello world
+/*print("hello world
 
 let c = 100_000.25_18
 print(c)
@@ -111,6 +111,5 @@ print(adder2(1,3))
 print(adder2(a:1, b:3))
 
 let num = 0
-num += 10 + "string here"
+/*num += 10 + "string here"
 print(num)
-

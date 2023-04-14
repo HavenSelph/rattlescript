@@ -153,11 +153,7 @@ impl Parser {
                     self.consume_line_end()?;
                     let (func, name) = self.parse_function()?;
                     self.consume_line_end()?;
-                    let func = Rc::new(AST::Call(
-                        start.extend(deco.span()),
-                        deco,
-                        vec![(None, func)],
-                    ));
+                    let func = Rc::new(AST::Call(start.extend(deco.span()),deco,vec![(None, func)],));
                     methods.push((name, func));
                 }
                 TokenKind::Def => {
@@ -309,7 +305,7 @@ impl Parser {
                     _ => {
                         self.consume_line_end_until(until)?;
                         Ok(Rc::new(AST::If(span, cond, body, None)))
-                    }
+                    },
                 }
             }
             Token {

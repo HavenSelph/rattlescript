@@ -112,32 +112,13 @@ pub struct ClassInstance {
     pub fields: std::collections::HashMap<String, Value>,
 }
 
-pub type BuiltInFunctionType = fn(&Span, Vec<Value>) -> Result<Value>;
-
-macro_rules! builtin {
-    ($name:ident) => {
-        crate::interpreter::value::Value::BuiltInFunction(
-            crate::interpreter::value::BuiltInFunction(
-                stringify!($name),
-                make!(crate::interpreter::builtin::$name),
-            ),
-        )
-    };
-}
-
-pub(crate) use builtin;
-
-#[derive(Clone)]
-pub struct BuiltInFunction(pub &'static str, pub Ref<BuiltInFunctionType>);
-
 #[derive(Clone)]
 pub enum Value {
     Array(Ref<Vec<Value>>),
     Tuple(Ref<Vec<Value>>),
     Boolean(bool),
-    BuiltInFunction(BuiltInFunction),
+    BuiltInFunction(Ref<String>),
     Float(f64),
-    File(Ref<(String, std::fs::File)>),
     Class(Ref<Class>),
     ClassInstance(Ref<ClassInstance>),
     Function(Ref<Function>),
@@ -162,8 +143,7 @@ impl Hash for Value {
                 start.hash(state);
                 end.hash(state);
             }
-            Value::File(_) => 0.hash(state),
-            Value::BuiltInFunction(name) => name.0.hash(state),
+            Value::BuiltInFunction(name) => name.borrow().hash(state),
             Value::Function(func) => func.as_ptr().hash(state),
             Value::Class(class) => class.as_ptr().hash(state),
             Value::ClassInstance(instance) => instance.as_ptr().hash(state),
@@ -185,11 +165,10 @@ impl std::fmt::Debug for Value {
             Value::Float(num) => write!(f, "{}", num),
             Value::String(string) => write!(f, "{}", string.borrow()),
             Value::Boolean(boolean) => write!(f, "{}", boolean),
-            Value::File(name) => write!(f, "<file {}>", name.borrow().0),
             Value::Nothing => write!(f, "nothing"),
             Value::Iterator(_) => write!(f, "<iterator>"),
             Value::Range(start, end) => write!(f, "{}..{}", start, end),
-            Value::BuiltInFunction(name) => write!(f, "<builtin {}>", name.0),
+            Value::BuiltInFunction(name) => write!(f, "<builtin {}>", name.borrow()),
             Value::Function(func) => {
                 let func = func.borrow();
                 write!(f, "<function {}: {}>", func.name, func.span.0)
@@ -264,7 +243,9 @@ impl std::cmp::PartialEq for Value {
                     left.iter().zip(right.iter()).all(|(a, b)| a == b)
                 }
             }
-            (Value::BuiltInFunction(left), Value::BuiltInFunction(right)) => left.0 == right.0,
+            (Value::BuiltInFunction(left), Value::BuiltInFunction(right)) => {
+                left.borrow().as_str() == right.borrow().as_str()
+            }
             (Value::Class(left), Value::Class(right)) => left.as_ptr() == right.as_ptr(),
             (Value::ClassInstance(left), Value::ClassInstance(right)) => {
                 left.as_ptr() == right.as_ptr()
@@ -391,19 +372,19 @@ impl Value {
                     error!(span, "Division by zero")
                 }
                 Value::Float(*left as f64 / *right)
-            }
+            },
             (Value::Float(left), Value::Float(right)) => {
                 if *right == 0.0 {
                     error!(span, "Division by zero")
                 }
                 Value::Float(*left / *right)
-            }
+            },
             (Value::Float(left), Value::Integer(right)) => {
                 if *right == 0 {
                     error!(span, "Division by zero")
                 }
                 Value::Float(*left / *right as f64)
-            }
+            },
             _ => error!(span, "Invalid types for division"),
         })
     }
@@ -555,9 +536,8 @@ impl Value {
                 let inst = inst.borrow();
                 format!("<instance of class {}>", inst.class.borrow().name)
             }
-            Value::File(file) => format!("<file {}>", file.borrow().0),
             Value::Range(start, end) => format!("{}..{}", start, end),
-            Value::BuiltInFunction(name) => format!("<built-in function {}>", name.0),
+            Value::BuiltInFunction(name) => format!("<built-in function {}>", name.borrow()),
             Value::Nothing => "nothing".to_string(),
             Value::Array(arr) => {
                 let arr = arr.borrow();
@@ -634,7 +614,7 @@ impl Value {
                     Some(v) => v.clone(),
                     None => error!(span, "Key not found"),
                 }
-            }
+            },
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
     }
