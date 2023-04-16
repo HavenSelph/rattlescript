@@ -78,7 +78,7 @@ impl Compiler {
                 out
             }
 
-            AST::Variable(_, name) => format!("value_identifier(\"ref({})\")", name),
+            AST::Variable(_, name) => format!("value_ref({})", name),
             AST::VarDeclaration(_, name, value) => {
                 if self.scopes.last().unwrap().variables.contains(name) {
                     format!("{name} = value_replace({}, {})", name, self.comp(value)?)

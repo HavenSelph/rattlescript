@@ -116,3 +116,4 @@ print(num)
 let f = open("test.txt")
 let e = f.read()
 print(e)
+
