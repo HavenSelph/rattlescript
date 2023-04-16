@@ -4,6 +4,7 @@
 
 #include "common.h"
 
+__attribute__((noreturn))
 void error(char *message) {
     printf("Error: %s", message);
     exit(1);

@@ -6,6 +6,7 @@ pub enum ErrorKind {
     Parser,
     UnexpectedEOF,
     Runtime,
+    Compiler,
 }
 
 #[derive(Debug)]
@@ -22,6 +23,7 @@ impl std::fmt::Display for Error {
                 write!(f, "SyntaxError: {}", self.message)
             }
             ErrorKind::Runtime => write!(f, "RuntimeError: {}", self.message),
+            ErrorKind::Compiler => write!(f, "CompilerError: {}", self.message),
         }
     }
 }
@@ -71,6 +73,20 @@ macro_rules! runtime_error {
     }
 }
 pub(crate) use runtime_error;
+
+macro_rules! compiler_error {
+    ($span:expr, $($arg:tt)*) => {
+        return Err(crate::error::Error{
+            kind: crate::error::ErrorKind::Compiler,
+            span: $span.clone(),
+            message: format!($($arg)*),
+        })
+    }
+}
+pub(crate) use compiler_error;
+
+
+
 
 impl Error {
     pub fn print_with_source(&self) {

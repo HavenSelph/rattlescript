@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+__attribute__((noreturn))
 void error(char *message);
 
 #endif //CALLUC_COMMON_H
