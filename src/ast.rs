@@ -1,6 +1,29 @@
 use crate::common::Span;
 use std::rc::Rc;
 
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ArgumentType {
+    Positional,
+    Variadic,
+    Keyword,
+    VariadicKeyword,
+}
+
+impl std::fmt::Display for ArgumentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ArgumentType::Positional => write!(f, "positional"),
+            ArgumentType::Variadic => write!(f, "positional variadic"),
+            ArgumentType::Keyword => write!(f, "keyword"),
+            ArgumentType::VariadicKeyword => write!(f, "keyword variadic"),
+        }
+    }
+}
+
+pub type FunctionArgs = Vec<(String, Option<Rc<AST>>, ArgumentType)>;
+pub type CallArgs = Vec<(Option<String>, Rc<AST>)>;
+
 #[derive(Debug)]
 pub enum AST {
     And(Span, Rc<AST>, Rc<AST>),
@@ -14,14 +37,16 @@ pub enum AST {
         methods: Vec<(String, Rc<AST>)>,
     },
     BooleanLiteral(Span, bool),
-    Call(Span, Rc<AST>, Vec<(Option<String>, Rc<AST>)>),
+    Call(Span, Rc<AST>, CallArgs),
     Divide(Span, Rc<AST>, Rc<AST>),
     Modulo(Span, Rc<AST>, Rc<AST>),
     FloatLiteral(Span, f64),
     Function {
         span: Span,
         name: Option<String>,
-        args: Vec<(String, Option<Rc<AST>>)>,
+        args: FunctionArgs,
+        required: usize,
+        in_class: bool,
         body: Rc<AST>,
     },
     If(Span, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
