@@ -1,0 +1,47 @@
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Installing Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Running tests
+        run: |
+          cd ${{ github.workspace }}
+          python3 -m pip install colorama
+          python3 ./tests/test.py
+  test_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Installing Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Running tests
+        run: |
+          cd ${{ github.workspace }}
+            python -m pip install colorama
+          python ./tests/test.py
+  test_macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Installing Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Running tests
+        run: |
+          cd ${{ github.workspace }}
+          python3 -m pip install colorama
+          python3 ./tests/test.py

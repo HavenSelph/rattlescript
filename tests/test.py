@@ -155,13 +155,16 @@ def main():
         default=multiprocessing.cpu_count(),
     )
     args = parser.parse_args()
-    interpreter_path = f'./target/{args.interpreter}/rattlescript.exe'
     if args.interpreter != 'debug':
         run(["cargo", "build", f"--{args.interpreter}"])
     else:
         run(["cargo", "build"])
+    interpreter_path = Path().cwd() / 'target' / 'debug' / 'rattlescript'
     if not os.path.isfile(interpreter_path):
-        raise FileNotFoundError(f'Could not find interpreter {args.interpreter} at {interpreter_path}')
+        if not os.path.isfile(interpreter_path.with_suffix('.exe')):
+            raise FileNotFoundError(f'Could not find interpreter {args.interpreter} at {interpreter_path}')
+        else:
+            interpreter_path = interpreter_path.with_suffix('.exe')
     arg_files = args.files if isinstance(args.files, list) else [args.files]
     test_paths = [Path(pth) for pth in arg_files]
 
