@@ -1,0 +1,7 @@
+/// exit: 0
+
+assert true or false
+assert false or true
+assert not (false and true)
+assert not (true and false)
+assert true and true

@@ -1,0 +1,15 @@
+/// out: "5\n[0, 1, 1, 2]"
+
+def fib(n) {
+    let a = 0
+    let b = 1
+    for i in 0..n {
+        let t = a
+        a = b
+        b = t + b
+    }
+    return a
+}
+
+print(fib(5))
+print([fib(x) for x in 0..4])

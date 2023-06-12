@@ -1,0 +1,4 @@
+/// exit: 0
+
+let x = |a,b| => a+b
+assert x(1,2) == 3

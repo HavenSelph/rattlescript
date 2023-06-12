@@ -1,0 +1,10 @@
+/// exit: 0
+// https://github.com/mustafaquraish/aecor/blob/master/tests/binops.ae
+assert 1 + 1 * 2 == 3
+assert 2 * 2 ** 3 == 16
+assert 2 ** 3 * 2 == 16
+assert 2 ** 3 ** 2 == 512
+assert 11 * (10 + 1) == 121
+assert 11 * 10 + 1 == 111
+assert 5 - 2 - 3 == 0
+assert 8 / 2 / 2 == 2

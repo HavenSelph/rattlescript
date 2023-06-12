@@ -1,0 +1,4 @@
+/// exit: 0
+
+assert [print(x) for x in [1,2,3,4]] == [nothing, nothing, nothing, nothing]
+assert [x for x in [1,2,3,4] if x > 2] == [3,4]

@@ -1,0 +1,5 @@
+class player {
+    name,
+    age=1
+}
+

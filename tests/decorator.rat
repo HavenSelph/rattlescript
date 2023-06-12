@@ -1,0 +1,25 @@
+/// out: "Adding\nSubtracting"
+
+def operator(msg) {
+    def wrapper(fn) {
+        def inner(a, b) {
+            print(msg)
+            return fn(a, b)
+        }
+        return inner
+    }
+    return wrapper
+}
+
+@operator("Adding")
+def add(a, b) {
+    return a + b
+}
+
+@operator("Subtracting")
+def sub(a, b) {
+    return a - b
+}
+
+add(1,2)
+sub(1,2)

@@ -1,0 +1,5 @@
+/// exit: 0
+
+let x = 1
+let y = 2
+let a = x = y = 3

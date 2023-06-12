@@ -1,0 +1,16 @@
+/// out: "x is something\ny is nothing"
+
+let x = "hello"
+let y = nothing
+
+if x != nothing {
+    print("x is something")
+}
+
+if y == nothing {
+    print("y is nothing")
+}
+
+if false {
+    print("this will never be printed")
+}

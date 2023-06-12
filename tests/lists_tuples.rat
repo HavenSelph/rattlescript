@@ -1,0 +1,7 @@
+/// out: "1,2,3\n1,2,3"
+
+let x = [1,2,3]
+print(x.iter().map(str).join(","))
+
+let y = (1,2,3)
+print(y.iter().map(str).join(","))
