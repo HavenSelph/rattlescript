@@ -1,5 +1,5 @@
 use crate::ast::AST;
-use crate::common::{get, make, Ref, Span};
+use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Interpreter, Scope};
 use std::hash::{Hash, Hasher};
@@ -13,23 +13,45 @@ pub struct IteratorValue(pub Ref<dyn Iterator<Item = Value>>);
     time when changing them into an iterator. Need to fix that.
  */
 
+
+struct RcChars {
+    _rc: Rc<String>,
+    chars: Option<std::str::Chars<'static>>,
+}
+
+impl Iterator for RcChars {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(ref mut chars) = self.chars {
+            Some(chars.next()?.to_string())
+        } else {
+            None
+        }
+    }
+}
+
+impl RcChars {
+    pub fn from_rc(rc: Rc<String>) -> RcChars {
+        let mut new = Self {
+            _rc: rc,
+            chars: None,
+        };
+        new.chars = Some(unsafe { &*Rc::as_ptr(&new._rc) }.chars());
+        new
+    }
+}
+
+
 struct StringIterator {
-    string: Ref<String>,
-    index: usize,
+    data: RcChars,
 }
 
 impl Iterator for StringIterator {
     type Item = Value;
 
     fn next(&mut self) -> Option<Value> {
-        let string = self.string.borrow();
-        if self.index >= string.len() {
-            None
-        } else {
-            let c = string.chars().nth(self.index).unwrap();
-            self.index += 1;
-            Some(Value::String(make!(c.to_string())))
-        }
+        Some(Value::String(Rc::new(self.data.next()?)))
     }
 }
 
@@ -74,8 +96,8 @@ impl Iterator for DictIterator {
 }
 
 impl IteratorValue {
-    pub fn for_string(string: Ref<String>) -> IteratorValue {
-        IteratorValue(make!(StringIterator { string, index: 0 }))
+    pub fn for_string(data: Rc<String>) -> IteratorValue {
+        IteratorValue(make!(StringIterator { data: RcChars::from_rc(data) }))
     }
 
     pub fn for_range(start: &i64, end: &i64) -> IteratorValue {
@@ -151,7 +173,7 @@ pub enum Value {
     Nothing,
     Range(i64, i64),
     Dict(Ref<std::collections::HashMap<Value, Value>>),
-    String(Ref<String>),
+    String(Rc<String>),
 }
 
 impl Hash for Value {
@@ -159,7 +181,7 @@ impl Hash for Value {
         match self {
             Value::Integer(num) => num.hash(state),
             Value::Float(num) => num.to_bits().hash(state),
-            Value::String(string) => string.borrow().hash(state),
+            Value::String(string) => string.hash(state),
             Value::Boolean(boolean) => boolean.hash(state),
             Value::Nothing => 0.hash(state),
             Value::Iterator(_) => 0.hash(state),
@@ -188,7 +210,7 @@ impl std::fmt::Debug for Value {
         match self {
             Value::Integer(num) => write!(f, "{}", num),
             Value::Float(num) => write!(f, "{}", num),
-            Value::String(string) => write!(f, "{}", string.borrow()),
+            Value::String(string) => write!(f, "{}", string),
             Value::Boolean(boolean) => write!(f, "{}", boolean),
             Value::File(name) => write!(f, "<file {}>", name.borrow().0),
             Value::Nothing => write!(f, "nothing"),
@@ -257,7 +279,7 @@ impl std::cmp::PartialEq for Value {
             (Value::Integer(left), Value::Float(right)) => *left as f64 == *right,
             (Value::Float(left), Value::Float(right)) => *left == *right,
             (Value::Float(left), Value::Integer(right)) => *left == *right as f64,
-            (Value::String(left), Value::String(right)) => *left.borrow() == *right.borrow(),
+            (Value::String(left), Value::String(right)) => *left == *right,
             (Value::Boolean(left), Value::Boolean(right)) => *left == *right,
             (Value::Array(left), Value::Array(right))
             | (Value::Tuple(left), Value::Tuple(right)) => {
@@ -311,7 +333,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Float(*left + *right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left + *right as f64),
             (Value::String(left), Value::String(right)) => {
-                Value::String(make!(left.borrow().clone() + get!(right)))
+                Value::String(Rc::new(left.to_string() + right.as_str()))
             }
             (Value::Array(left), Value::Array(right)) => {
                 let mut left = left.borrow().clone();
@@ -343,7 +365,7 @@ impl Value {
                 if *right < 0 {
                     error!(span, "{right} is not a positive integer.")
                 }
-                Value::String(make!(left.borrow().repeat(*right as usize)))
+                Value::String(Rc::new(left.repeat(*right as usize)))
             }
             _ => error!(span, "Invalid types for multiplication"),
         })
@@ -429,7 +451,7 @@ impl Value {
 
         match self {
             Value::String(s) => {
-                let s = s.borrow();
+                let s = s;
                 let (start, end, step) = get_slice_params(span, start, end, step, s.len() as i64)?;
                 let res = s
                     .chars()
@@ -437,7 +459,7 @@ impl Value {
                     .skip(start as usize)
                     .step_by(step as usize)
                     .collect::<String>();
-                Ok(Value::String(make!(res)))
+                Ok(Value::String(Rc::new(res)))
             }
             Value::Array(a) => {
                 let a = a.borrow();
@@ -535,7 +557,7 @@ impl Value {
         match self {
             Value::Integer(i) => i.to_string(),
             Value::Float(f) => f.to_string(),
-            Value::String(s) => escape_string(s.borrow().as_str()),
+            Value::String(s) => escape_string(s.as_str()),
             Value::Boolean(b) => b.to_string(),
             Value::Iterator(_) => "<iterator>".to_string(),
             Value::Function(func) => {
@@ -608,8 +630,8 @@ impl Value {
     pub fn index(&self, index: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, index) {
             (Value::String(s), Value::Integer(index)) => {
-                match s.borrow().chars().nth(*index as usize) {
-                    Some(c) => Value::String(make!(c.to_string())),
+                match s.chars().nth(*index as usize) {
+                    Some(c) => Value::String(Rc::new(c.to_string())),
                     None => error!(span, "Index out of bounds"),
                 }
             }

@@ -4,6 +4,7 @@ use crate::interpreter::value::{ClassInstance, Value};
 use crate::interpreter::{ControlFlow, Interpreter, Scope};
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::rc::Rc;
 
 pub fn handle_call(
     interpreter: &mut Interpreter,
@@ -113,7 +114,7 @@ pub fn repr(
     if args.len() != 1 {
         error!(span, "repr() takes exactly one argument");
     }
-    Ok(Value::String(make!(args[0].repr())))
+    Ok(Value::String(Rc::new(args[0].repr())))
 }
 
 pub fn len(
@@ -127,7 +128,7 @@ pub fn len(
     }
 
     Ok(match &args[0] {
-        Value::String(string) => Value::Integer(string.borrow().len() as i64),
+        Value::String(string) => Value::Integer(string.len() as i64),
         Value::Array(array) | Value::Tuple(array) => Value::Integer(array.borrow().len() as i64),
         Value::Dict(dict) => Value::Integer(dict.borrow().len() as i64),
         Value::Range(start, end) => Value::Integer(end - start),
@@ -202,7 +203,7 @@ pub fn input(
 ) -> Result<Value> {
     let prompt = if args.len() == 1 {
         match &args[0] {
-            Value::String(string) => string.borrow().clone(),
+            Value::String(string) => string.to_string(),
             _ => error!(span, "input() may only take a string as argument"),
         }
     } else if args.is_empty() {
@@ -215,7 +216,7 @@ pub fn input(
     std::io::Write::flush(&mut std::io::stdout()).unwrap();
     std::io::stdin().read_line(&mut input).unwrap();
     input = input.trim_end().to_string();
-    Ok(Value::String(make!(input)))
+    Ok(Value::String(Rc::new(input)))
 }
 
 pub fn dict_get(
@@ -312,17 +313,17 @@ pub fn split(
         error!(span, "split() takes exactly two arguments");
     }
     let string = match &args[0] {
-        Value::String(string) => string.borrow(),
+        Value::String(string) => string,
         _ => error!(span, "split() may only take a string as first argument"),
     };
     println!("{}", string);
     let separator = match &args[1] {
-        Value::String(string) => string.borrow(),
+        Value::String(string) => string,
         _ => error!(span, "split() may only take a string as second argument"),
     };
     let mut items = Vec::new();
     for item in string.split(separator.as_str()) {
-        items.push(Value::String(make!(item.to_string())));
+        items.push(Value::String(Rc::new(item.to_string())));
     }
     Ok(Value::Array(make!(items)))
 }
@@ -345,7 +346,7 @@ pub fn join(
     };
 
     let separator = match args.get(1) {
-        Some(Value::String(string)) => string.borrow().clone(),
+        Some(Value::String(string)) => string.to_string(),
         None => " ".to_string(),
         _ => error!(span, "join() may only take a string as the second argument"),
     };
@@ -356,11 +357,11 @@ pub fn join(
             result.push_str(separator.as_str());
         }
         match item {
-            Value::String(string) => result.push_str(string.borrow().as_str()),
+            Value::String(string) => result.push_str(string.as_str()),
             _ => error!(span, "join() may only take an iterator of strings"),
         }
     }
-    Ok(Value::String(make!(result)))
+    Ok(Value::String(Rc::new(result)))
 }
 
 pub fn map(
@@ -416,7 +417,7 @@ pub fn to_int(
         Value::Integer(i) => *i,
         Value::Float(f) => *f as i64,
         Value::Boolean(b) => *b as i64,
-        Value::String(string) => match string.borrow().parse() {
+        Value::String(string) => match string.parse() {
             Ok(i) => i,
             Err(_) => error!(span, "Could not parse string as integer"),
         },
@@ -437,7 +438,7 @@ pub fn to_float(
     let value = match &args[0] {
         Value::Integer(i) => *i as f64,
         Value::Float(f) => *f,
-        Value::String(string) => match string.borrow().parse() {
+        Value::String(string) => match string.parse() {
             Ok(f) => f,
             Err(_) => error!(span, "Could not parse string as float"),
         },
@@ -456,7 +457,7 @@ pub fn to_str(
         error!(span, "str() takes exactly one argument");
     }
     let value = format!("{:?}", args[0]);
-    Ok(Value::String(make!(value)))
+    Ok(Value::String(Rc::new(value)))
 }
 
 pub fn to_iter(
@@ -523,14 +524,14 @@ pub fn file_open(
         error!(span, "open() takes exactly one argument");
     }
     let path = match &args[0] {
-        Value::String(string) => string.borrow().clone(),
+        Value::String(string) => string.clone(),
         _ => error!(span, "open() may only take a string as first argument"),
     };
-    let file = match std::fs::File::open(&path) {
+    let file = match std::fs::File::open(path.to_string()) {
         Ok(file) => file,
         Err(err) => error!(span, "Could not open file: {}", err),
     };
-    Ok(Value::File(make!((path, file))))
+    Ok(Value::File(make!((path.to_string(), file))))
 }
 
 pub fn file_read(
@@ -556,7 +557,7 @@ pub fn file_read(
     let mut file = file.borrow_mut();
     let mut buffer = String::new();
     match file.1.read_to_string(&mut buffer) {
-        Ok(_) => Ok(Value::String(make!(buffer))),
+        Ok(_) => Ok(Value::String(Rc::new(buffer))),
         Err(err) => error!(span, "Could not read file: {}", err),
     }
 }
@@ -575,7 +576,7 @@ pub fn file_write(
         _ => error!(span, "write() may only take a file as first argument"),
     };
     let string = match &args[1] {
-        Value::String(string) => string.borrow(),
+        Value::String(string) => string,
         _ => error!(span, "write() may only take a string as second argument"),
     };
     let mut file = file.borrow_mut();

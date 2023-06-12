@@ -112,7 +112,7 @@ impl Interpreter {
             AST::BooleanLiteral(_, value) => Value::Boolean(*value),
             AST::IntegerLiteral(_, num) => Value::Integer(*num),
             AST::FloatLiteral(_, num) => Value::Float(*num),
-            AST::StringLiteral(_, string) => Value::String(make!(string.clone())),
+            AST::StringLiteral(_, string) => Value::String(Rc::new(string.clone())),
             AST::Nothing(_) => Value::Nothing,
 
             AST::Plus(span, left, right) => dispatch_op!(span, Value::plus, left, right),
@@ -523,7 +523,7 @@ impl Interpreter {
                         result.push_str(format!("{:?}", expr).as_str());
                     }
                 }
-                Value::String(make!(result))
+                Value::String(Rc::new(result))
             }
             AST::Range(span, start, end) => {
                 let start = self.run(start, scope.clone())?;
