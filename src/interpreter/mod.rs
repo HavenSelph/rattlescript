@@ -1,7 +1,7 @@
 use crate::ast::AST;
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::{Class, ClassInstance, Function, IteratorValue, Value, builtin};
+use crate::interpreter::value::{builtin, Class, ClassInstance, Function, IteratorValue, Value};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -57,7 +57,6 @@ enum ControlFlow {
     Return(Value),
 }
 
-
 pub struct Interpreter {
     control_flow: ControlFlow,
 }
@@ -86,7 +85,7 @@ impl Interpreter {
                     last = Some(self.run(stmt, scope.clone())?);
                     match self.control_flow {
                         ControlFlow::None => {}
-                        _ => break
+                        _ => break,
                     }
                 }
                 Ok(last.unwrap_or_else(|| Value::Nothing))
@@ -341,25 +340,21 @@ impl Interpreter {
                 let block_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
                 self.run_block_without_new_scope(ast, block_scope)?
             }
-            AST::Variable(span, name) => {
-                match name.as_str() {
-                    "len" => builtin!(len),
-                    "print" => builtin!(print),
-                    "input" => builtin!(input),
-                    "str" => builtin!(to_str),
-                    "repr" => builtin!(repr),
-                    "open" => builtin!(file_open),
-                    "exit" => builtin!(exit),
-                    _ => {
-                        match scope.borrow().get(name) {
-                            Some(val) => val,
-                            None => {
-                                error!(span, "Variable '{}' not found", name);
-                            }
-                        }
+            AST::Variable(span, name) => match name.as_str() {
+                "len" => builtin!(len),
+                "print" => builtin!(print),
+                "input" => builtin!(input),
+                "str" => builtin!(to_str),
+                "repr" => builtin!(repr),
+                "open" => builtin!(file_open),
+                "exit" => builtin!(exit),
+                _ => match scope.borrow().get(name) {
+                    Some(val) => val,
+                    None => {
+                        error!(span, "Variable '{}' not found", name);
                     }
-                }
-            }
+                },
+            },
             AST::Return(span, val) => {
                 if !scope.borrow_mut().in_function {
                     error!(span, "Return statement outside of function")
@@ -375,20 +370,16 @@ impl Interpreter {
             AST::VarDeclaration(span, name, value) => {
                 self.check_arg_name(name, span)?;
                 let value = self.run(value, scope.clone())?;
-                scope
-                    .borrow_mut()
-                    .insert(name, value, false, span)?;
+                scope.borrow_mut().insert(name, value, false, span)?;
                 Value::Nothing
             }
             AST::Assert(loc, cond, msg) => {
                 let cond = self.run(cond, scope)?;
                 match cond {
                     Value::Boolean(true) => {}
-                    Value::Boolean(false) => {
-                        match msg {
-                            Some(msg) => error!(loc, "Assertion failed: {}", msg),
-                            _ => error!(loc, "Assertion failed"),
-                        }
+                    Value::Boolean(false) => match msg {
+                        Some(msg) => error!(loc, "Assertion failed: {}", msg),
+                        _ => error!(loc, "Assertion failed"),
                     },
                     _ => error!(loc, "Assertion condition must be a boolean"),
                 }
@@ -636,7 +627,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn check_arg_name(&self, name: &str, span: &Span) -> Result<()>{
+    fn check_arg_name(&self, name: &str, span: &Span) -> Result<()> {
         if name == "self" {
             error!(span, "Argument name can't be `self`")
         // } else if self.builtins.contains_key(name) {

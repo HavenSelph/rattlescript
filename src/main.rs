@@ -3,14 +3,14 @@
 use crate::error::Result;
 
 mod ast;
+mod common;
+mod compiler;
 mod error;
 mod interpreter;
 mod lexer;
 mod parser;
-mod common;
 mod repl;
 mod token;
-mod compiler;
 
 fn run_file(filename: &str) -> Result<()> {
     let content = std::fs::read_to_string(filename).expect("Couldn't open input file");
@@ -28,7 +28,7 @@ fn run_file(filename: &str) -> Result<()> {
 
 fn compile_file(filename: &str, out_filename: &str) -> Result<()> {
     use std::io::Write;
-    
+
     let content = std::fs::read_to_string(filename).expect("Couldn't open input file");
 
     let mut lex = lexer::Lexer::new(content, Box::leak(filename.to_string().into_boxed_str()));
@@ -42,7 +42,9 @@ fn compile_file(filename: &str, out_filename: &str) -> Result<()> {
 
     // output code to out.c
     let mut out_file = std::fs::File::create(out_filename).expect("Couldn't open output file");
-    out_file.write_all(code.as_bytes()).expect("Couldn't write to output file");
+    out_file
+        .write_all(code.as_bytes())
+        .expect("Couldn't write to output file");
     // println!("{}", code);
     Ok(())
 }
@@ -78,7 +80,6 @@ fn main() {
         }
     };
 
-
     let result = if compile {
         compile_file(filename, out_filename)
     } else {
@@ -94,7 +95,6 @@ fn main() {
             } else {
                 err.print_with_source();
                 std::process::exit(1);
-
             }
         }
     }

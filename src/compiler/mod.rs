@@ -1,7 +1,7 @@
-use std::env;
-use crate::error::{compiler_error, Result};
-use std::rc::Rc;
 use crate::ast::AST;
+use crate::error::{compiler_error, Result};
+use std::env;
+use std::rc::Rc;
 
 pub struct Scope {
     pub variables: Vec<String>,
@@ -37,7 +37,10 @@ impl Compiler {
     }
 
     pub fn compile(&mut self, ast: &Rc<AST>) -> Result<String> {
-        let runtimes = format!("#include \"{}\\runtime\\datatypes\\value.h\"\n", env::current_dir().unwrap().display());
+        let runtimes = format!(
+            "#include \"{}\\runtime\\datatypes\\value.h\"\n",
+            env::current_dir().unwrap().display()
+        );
         self.buf.push_str(runtimes.as_str());
         self.buf.push_str("\nint main() {\n");
         let out = self.comp(ast)?;
@@ -86,8 +89,10 @@ impl Compiler {
                     self.scopes.last_mut().unwrap().add_variable(name);
                     format!("Value *{} = {}", name, self.comp(value)?)
                 }
-            },
-            AST::Assignment(_, name, value) => format!("{name} = value_replace({}, {})", name, self.comp(value)?),
+            }
+            AST::Assignment(_, name, value) => {
+                format!("{name} = value_replace({}, {})", name, self.comp(value)?)
+            }
 
             AST::IntegerLiteral(_, num) => format!("value_int({})", num),
             AST::FloatLiteral(_, num) => format!("value_float({})", num),
@@ -104,12 +109,24 @@ impl Compiler {
                 out
             }
 
-            AST::Plus(_, left, right) => format!("value_add({}, {})", self.comp(left)?, self.comp(right)?),
-            AST::Minus(_, left, right) => format!("value_sub({}, {})", self.comp(left)?, self.comp(right)?),
-            AST::Multiply(_, left, right) => format!("value_mul({}, {})", self.comp(left)?, self.comp(right)?),
-            AST::Divide(_, left, right) => format!("value_div({}, {})", self.comp(left)?, self.comp(right)?),
-            AST::Modulo(_, left, right) => format!("value_mod({}, {})", self.comp(left)?, self.comp(right)?),
-            AST::Power(_, left, right) => format!("value_pow({}, {})", self.comp(left)?, self.comp(right)?),
+            AST::Plus(_, left, right) => {
+                format!("value_add({}, {})", self.comp(left)?, self.comp(right)?)
+            }
+            AST::Minus(_, left, right) => {
+                format!("value_sub({}, {})", self.comp(left)?, self.comp(right)?)
+            }
+            AST::Multiply(_, left, right) => {
+                format!("value_mul({}, {})", self.comp(left)?, self.comp(right)?)
+            }
+            AST::Divide(_, left, right) => {
+                format!("value_div({}, {})", self.comp(left)?, self.comp(right)?)
+            }
+            AST::Modulo(_, left, right) => {
+                format!("value_mod({}, {})", self.comp(left)?, self.comp(right)?)
+            }
+            AST::Power(_, left, right) => {
+                format!("value_pow({}, {})", self.comp(left)?, self.comp(right)?)
+            }
 
             _ => compiler_error!(ast.span(), "Unsupported AST node: {:?}", ast),
         });

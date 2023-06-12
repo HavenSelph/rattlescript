@@ -5,9 +5,13 @@ use crate::interpreter::{Interpreter, Scope};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-
 #[derive(Clone)]
 pub struct IteratorValue(pub Ref<dyn Iterator<Item = Value>>);
+
+/*
+    FixMe: Iterator has a bug that causes it to run comprehensions a second
+    time when changing them into an iterator. Need to fix that.
+ */
 
 struct StringIterator {
     string: Ref<String>,
@@ -113,13 +117,16 @@ pub struct ClassInstance {
     pub fields: std::collections::HashMap<String, Value>,
 }
 
-
 pub type BuiltInFunctionType = fn(&mut Interpreter, Ref<Scope>, &Span, Vec<Value>) -> Result<Value>;
-
 
 macro_rules! builtin {
     ($name:ident) => {
-        crate::interpreter::value::Value::BuiltInFunction(crate::interpreter::value::BuiltInFunction(stringify!($name), make!(crate::interpreter::builtin::$name)))
+        crate::interpreter::value::Value::BuiltInFunction(
+            crate::interpreter::value::BuiltInFunction(
+                stringify!($name),
+                make!(crate::interpreter::builtin::$name),
+            ),
+        )
     };
 }
 
@@ -127,7 +134,6 @@ pub(crate) use builtin;
 
 #[derive(Clone)]
 pub struct BuiltInFunction(pub &'static str, pub Ref<BuiltInFunctionType>);
-
 
 #[derive(Clone)]
 pub enum Value {
@@ -263,9 +269,7 @@ impl std::cmp::PartialEq for Value {
                     left.iter().zip(right.iter()).all(|(a, b)| a == b)
                 }
             }
-            (Value::BuiltInFunction(left), Value::BuiltInFunction(right)) => {
-                left.0 == right.0
-            }
+            (Value::BuiltInFunction(left), Value::BuiltInFunction(right)) => left.0 == right.0,
             (Value::Class(left), Value::Class(right)) => left.as_ptr() == right.as_ptr(),
             (Value::ClassInstance(left), Value::ClassInstance(right)) => {
                 left.as_ptr() == right.as_ptr()
@@ -382,19 +386,19 @@ impl Value {
                     error!(span, "Division by zero")
                 }
                 Value::Float(*left as f64 / *right)
-            },
+            }
             (Value::Float(left), Value::Float(right)) => {
                 if *right == 0.0 {
                     error!(span, "Division by zero")
                 }
                 Value::Float(*left / *right)
-            },
+            }
             (Value::Float(left), Value::Integer(right)) => {
                 if *right == 0 {
                     error!(span, "Division by zero")
                 }
                 Value::Float(*left / *right as f64)
-            },
+            }
             _ => error!(span, "Invalid types for division"),
         })
     }
@@ -625,7 +629,7 @@ impl Value {
                     Some(v) => v.clone(),
                     None => error!(span, "Key not found"),
                 }
-            },
+            }
             (value, index) => error!(span, "Can't index {:?} with {:?}", value, index),
         })
     }
