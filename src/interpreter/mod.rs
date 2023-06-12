@@ -122,10 +122,6 @@ impl Interpreter {
             AST::Power(loc, left, right) => dispatch_op!(loc, Value::power, left, right),
             AST::Divide(loc, left, right) => dispatch_op!(loc, Value::divide, left, right),
             AST::Modulo(loc, left, right) => dispatch_op!(loc, Value::modulo, left, right),
-            AST::FloorDivide(loc, left, right) => {
-                dispatch_op!(loc, Value::floor_divide, left, right)
-            }
-
             AST::Negate(loc, expr) => dispatch_op!(loc, Value::negate, expr),
             AST::Not(loc, expr) => dispatch_op!(loc, Value::not, expr),
             AST::And(loc, left, right) => dispatch_op!(loc, Value::and, left, right),

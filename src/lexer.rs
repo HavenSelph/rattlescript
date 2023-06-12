@@ -149,7 +149,7 @@ impl Lexer {
                     _ => self.push_simple(&mut tokens, TokenKind::Star, 1),
                 },
                 '/' => match self.peek(1) {
-                    Some('*') => {
+                    Some('/') => {
                         while let Some(c) = self.cur() {
                             self.increment();
                             if c == '\n' {
@@ -157,7 +157,20 @@ impl Lexer {
                             }
                         }
                     }
-                    Some('/') => self.push_simple(&mut tokens, TokenKind::SlashSlash, 2),
+                    Some('*') => {
+                        let mut closed = false;
+                        while let Some(c) = self.cur() {
+                            self.increment();
+                            if c == '*' && self.cur() == Some('/') {
+                                self.increment();
+                                closed = true;
+                                break
+                            }
+                        }
+                        if !closed {
+                            error!(Span(start, self.loc()), "Unterminated block comment");
+                        }
+                    }
                     Some('=') => self.push_simple(&mut tokens, TokenKind::SlashEquals, 2),
                     _ => self.push_simple(&mut tokens, TokenKind::Slash, 1),
                 },

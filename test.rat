@@ -84,7 +84,7 @@ for x in 0..5 {
 }
 print("repr of this")
 
-/* print("hello world
+// print("hello world
 
 let c = 100_000.25_18
 print(c)
@@ -116,4 +116,3 @@ print(num)
 let f = open("test.txt")
 let e = f.read()
 print(e)
-

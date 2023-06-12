@@ -58,7 +58,6 @@ pub enum TokenKind {
     SemiColon,
     Percent,
     Slash,
-    SlashSlash,
     SlashEquals,
     Star,
     StarEquals,
