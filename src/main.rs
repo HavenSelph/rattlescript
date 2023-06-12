@@ -58,10 +58,12 @@ fn main() {
     let mut filename = None;
     let out_filename = "./local/compiled/out.c";
     let mut compile = false;
+    let mut disable_error_context = false;
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
             "-c" | "--compile" => compile = true,
+            "-d" | "--disable-error-context" => disable_error_context = true,
             arg => {
                 filename = Some(arg);
             }
@@ -86,8 +88,14 @@ fn main() {
     match result {
         Ok(_) => std::process::exit(0),
         Err(err) => {
-            err.print_with_source();
-            std::process::exit(1);
+            if disable_error_context {
+                eprintln!("{} {}", err.span.0, err.message);
+                std::process::exit(1);
+            } else {
+                err.print_with_source();
+                std::process::exit(1);
+
+            }
         }
     }
 }
