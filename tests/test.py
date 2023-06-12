@@ -159,7 +159,7 @@ def main():
         run(["cargo", "build", f"--{args.interpreter}"])
     else:
         run(["cargo", "build"])
-    interpreter_path = Path().cwd() / 'target' / 'debug' / 'rattlescript'
+    interpreter_path = Path().cwd() / 'target' / args.interpreter / 'rattlescript'
     if not os.path.isfile(interpreter_path):
         if not os.path.isfile(interpreter_path.with_suffix('.exe')):
             raise FileNotFoundError(f'Could not find interpreter {args.interpreter} at {interpreter_path}')
