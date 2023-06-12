@@ -328,6 +328,31 @@ pub fn split(
     Ok(Value::Array(make!(items)))
 }
 
+pub fn strip(
+    _interpreter: &mut Interpreter,
+    _scope: Ref<Scope>,
+    span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    if args.len() > 2 {
+        error!(span, "strip() takes at most two arguments");
+    }
+    let string = match &args[0] {
+        Value::String(string) => string.to_string(),
+        _ => error!(span, "strip() may only take a string as first argument"),
+    };
+    let chars = if args.len() == 2 {
+        match &args[1] {
+            Value::String(string) => string.to_string(),
+            _ => error!(span, "strip() may only take a string as second argument"),
+        }
+    } else {
+        " \t\n\r".to_string()
+    };
+
+    Ok(Value::String(Rc::new(string.trim_matches(|c| chars.contains(c)).to_string())))
+}
+
 pub fn join(
     _interpreter: &mut Interpreter,
     _scope: Ref<Scope>,
