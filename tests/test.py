@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Union, Optional, Tuple
 import multiprocessing
 import colorama
-import textwrap
 colorama.init()
 
 
@@ -107,7 +106,7 @@ def handle_test(interpreter: str, path: Path, expected: Expected) -> Tuple[bool,
             try:
                 error_line = error.splitlines()[0]
                 remaining = error_line.split("Error: ")[1]
-            except IndexError as e:
+            except IndexError:
                 remaining = error
             return False, f"Did not find expected error message\nexpected: {expected_error}\ngot: '{remaining}'", path
 
@@ -124,6 +123,8 @@ def handle_test(interpreter: str, path: Path, expected: Expected) -> Tuple[bool,
             expected_out = literal_eval(expected.value).strip()
         except ValueError:
             expected_out = expected.value.strip()
+        except SyntaxError:
+            raise SyntaxError(f'Invalid options in file {path}')
         if output != expected_out:
             return False, f'Incorrect output produced\nexpected: {repr(expected_out)}\ngot: {repr(output)}', path
 
