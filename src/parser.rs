@@ -466,7 +466,7 @@ impl Parser {
                 ..
             } => {
                 self.increment();
-                let right = self.parse_logical_or()?;
+                let right = self.parse_assignment()?;
                 Ok(Rc::new(AST::Assignment(
                     left.span().extend(right.span()),
                     left,
