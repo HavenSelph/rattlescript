@@ -9,15 +9,17 @@ use std::rc::Rc;
 pub struct Repl {
     interpreter: Interpreter,
     global_scope: Ref<Scope>,
+    verbose: bool
 }
 
 impl Repl {
-    pub fn new() -> Repl {
+    pub fn new(verbose: bool) -> Repl {
         let interpreter = Interpreter::new();
         let global_scope = Scope::new(None, false);
         Repl {
             interpreter,
             global_scope,
+            verbose
         }
     }
 
@@ -47,6 +49,11 @@ impl Repl {
                 Err(err) => return Err(err),
             }
         };
+
+        if self.verbose {
+            println!("{:#?}", ast);
+        }
+
         let val = self
             .interpreter
             .run_block_without_new_scope(&ast, self.global_scope.clone())?;
@@ -60,6 +67,13 @@ impl Repl {
     fn try_parse(&self, input: String) -> Result<Rc<AST>> {
         let mut lex = crate::lexer::Lexer::new(input, "<repl>");
         let tokens = lex.lex()?;
+
+        if self.verbose {
+            for token in &tokens {
+                println!("{:?}", token);
+            }
+        }
+
         let mut parser = crate::parser::Parser::new(tokens);
         parser.parse()
     }
