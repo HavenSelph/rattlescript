@@ -1,0 +1,30 @@
+/// exit: 0
+
+print("Hello world!", 1, [1,2,3,4], nothing, {1:2})
+
+assert repr("Hello world!") == "\"Hello world!\""
+assert repr(1) == "1"
+assert repr([1,2,3,4]) == "[1, 2, 3, 4]"
+
+assert len([1,2,3]) == 3
+assert len("Hello world!") == 12
+
+let a = [1,2,3,4]
+a.push(a.pop())
+assert a==[1,2,3,4]
+
+assert {1:2}.get(1) == 2
+
+assert "Hello world!".split(" ") == ["Hello", "world!"]
+assert ["Hello", "world!"].iter().join(" ") == "Hello world!"
+
+assert [1,2,3,4].iter().map(str).join(", ") == "1, 2, 3, 4"
+
+assert (1.2).int() == 1
+
+assert str(1) == "1"
+
+// Todo: fix this bug related to file reading and splitting on same line
+//let file = open("./tests/builtins.rat")
+//let lines = file.read().split("\n")
+//assert lines[0] == "/// exit: 0"

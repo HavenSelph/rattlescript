@@ -1,0 +1,6 @@
+/// exit: 0
+
+let x = { "a": 1, "b": 2, "c": 3 }
+let keys = x.keys()
+let values = x.values()
+let items = x.items()
