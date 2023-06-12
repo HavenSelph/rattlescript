@@ -291,7 +291,31 @@ pub fn join(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, arg
     Ok(Value::String(make!(result)))
 }
 
-pub fn to_int(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn map(interpreter: &mut Interpreter, scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
+    if args.len() != 2 {
+        error!(span, "map() takes exactly two arguments");
+    }
+    let iter = match &args[0] {
+        Value::Iterator(iter) => iter,
+        _ => error!(span, "map() may only take an iterable as the first argument"),
+    };
+    let function = &args[1];
+    match function {
+        Value::Function(_) => {},
+        Value::BuiltInFunction(_) => {},
+        _ => error!(span, "map() may only take a function as the second argument"),
+    };
+    let mut result = Vec::new();
+    let iter = &mut *(*iter.0).borrow_mut();
+    for item in iter {
+        let value = handle_call(interpreter, scope.clone(), span, function.clone(), vec![item.clone()])?;
+        result.push(value);
+    }
+    Value::Array(make!(result)).iterator(span)
+}
+
+
+pub fn to_int(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "int() takes exactly one argument");
     }
@@ -339,7 +363,23 @@ pub fn to_iter(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, 
     args[0].iterator(span)
 }
 
-pub fn iter_enumerate(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn to_array(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
+    if args.len() != 1 {
+        error!(span, "collect() takes exactly one argument");
+    }
+    let iter = match &args[0] {
+        Value::Iterator(iter) => iter,
+        _ => error!(span, "collect() may only take an iterable as argument"),
+    };
+    let iter = &mut *(*iter.0).borrow_mut();
+    let mut items = Vec::new();
+    for item in iter {
+        items.push(item.clone());
+    }
+    Ok(Value::Array(make!(items)))
+}
+
+pub fn iter_enumerate(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "enumerate() takes exactly one argument");
     }
