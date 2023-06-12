@@ -380,11 +380,16 @@ impl Interpreter {
                     .insert(name, value, false, span)?;
                 Value::Nothing
             }
-            AST::Assert(loc, cond) => {
+            AST::Assert(loc, cond, msg) => {
                 let cond = self.run(cond, scope)?;
                 match cond {
                     Value::Boolean(true) => {}
-                    Value::Boolean(false) => error!(loc, "Assertion failed"),
+                    Value::Boolean(false) => {
+                        match msg {
+                            Some(msg) => error!(loc, "Assertion failed: {}", msg),
+                            _ => error!(loc, "Assertion failed"),
+                        }
+                    },
                     _ => error!(loc, "Assertion condition must be a boolean"),
                 }
                 Value::Nothing

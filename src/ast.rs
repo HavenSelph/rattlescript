@@ -4,7 +4,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub enum AST {
     And(Span, Rc<AST>, Rc<AST>),
-    Assert(Span, Rc<AST>),
+    Assert(Span, Rc<AST>, Option<String>),
     Assignment(Span, Rc<AST>, Rc<AST>),
     Block(Span, Vec<Rc<AST>>),
     Class {
@@ -133,7 +133,7 @@ impl std::fmt::Display for AST {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             AST::And(_, lhs, rhs) => write!(f, "({} and {})", lhs, rhs),
-            AST::Assert(_, expr) => write!(f, "assert {}", expr),
+            AST::Assert(_, expr, _) => write!(f, "assert {}", expr),
             AST::Assignment(_, lhs, rhs) => write!(f, "{} = {}", lhs, rhs),
             AST::Block(_, exprs) => write!(f, "<block with {} exprs>", exprs.len()),
             AST::BooleanLiteral(_, val) => write!(f, "{}", val),

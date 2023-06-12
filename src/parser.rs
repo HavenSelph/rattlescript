@@ -437,13 +437,14 @@ impl Parser {
                 self.increment();
                 let cond = self.parse_expression()?;
                 let span = span.extend(cond.span());
+                let mut msg = None;
                 if self.cur().kind == TokenKind::Comma {
                     self.increment();
                     span.extend(&self.cur().span);
-                    self.consume(TokenKind::StringLiteral)?;
+                    msg = Some(self.consume(TokenKind::StringLiteral)?.text);
                 }
                 self.consume_line_end_until(until)?;
-                Ok(Rc::new(AST::Assert(span, cond)))
+                Ok(Rc::new(AST::Assert(span, cond, msg)))
             }
             _ => {
                 let expr = self.parse_expression()?;
