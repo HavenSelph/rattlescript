@@ -1,4 +1,4 @@
-use crate::ast::AST;
+use crate::ast::{AST, ArgumentType};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Interpreter, Scope};
@@ -118,7 +118,8 @@ pub struct Function {
     pub span: Span,
     pub name: String,
     pub body: Rc<AST>,
-    pub args: Vec<(String, Option<Value>)>,
+    pub args: Vec<(String, Option<Value>, ArgumentType)>,
+    pub required: usize,
     pub scope: Ref<Scope>,
 }
 

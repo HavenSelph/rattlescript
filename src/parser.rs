@@ -1,7 +1,9 @@
-use crate::ast::AST;
+use crate::ast::{ArgumentType, AST, CallArgs, FunctionArgs};
 use crate::error::{eof_error, parser_error as error, Result};
 use crate::token::{Token, TokenKind};
 use std::rc::Rc;
+use crate::ast::ArgumentType::{Keyword, VariadicKeyword, Positional};
+use crate::token::TokenKind::RightParen;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -182,27 +184,46 @@ impl Parser {
         ))
     }
 
+    // OLD VERSION
+    // fn parse_lambda(&mut self) -> Result<Rc<AST>> {
+    //     let start = self.consume(TokenKind::Pipe)?.span;
+    //     let mut args = vec![];
+    //     while self.cur().kind != TokenKind::Pipe {
+    //         let name = self.consume(TokenKind::Identifier)?.text;
+    //         let default = if self.cur().kind == TokenKind::Equals {
+    //             self.increment();
+    //             Some(self.parse_expression()?)
+    //         } else {
+    //             None
+    //         };
+    //         args.push((name, default));
+    //         if self.cur().kind == TokenKind::Comma {
+    //             self.increment();
+    //         }
+    //     }
+    //     self.increment();
+    //     let body = if self.cur().kind == TokenKind::FatArrow {
+    //         self.increment();
+    //         let expr = self.parse_expression()?;
+    //         Rc::new(AST::Return(*expr.span(), expr))
+    //     } else {
+    //         self.parse_block(/*global*/ false)?
+    //     };
+    //     Ok(Rc::new(AST::Function {
+    //         span: start.extend(body.span()),
+    //         name: None,
+    //         args,
+    //         body,
+    //     }))
+    // }
+
     fn parse_lambda(&mut self) -> Result<Rc<AST>> {
         let start = self.consume(TokenKind::Pipe)?.span;
-        let mut args = vec![];
-        while self.cur().kind != TokenKind::Pipe {
-            let name = self.consume(TokenKind::Identifier)?.text;
-            let default = if self.cur().kind == TokenKind::Equals {
-                self.increment();
-                Some(self.parse_expression()?)
-            } else {
-                None
-            };
-            args.push((name, default));
-            if self.cur().kind == TokenKind::Comma {
-                self.increment();
-            }
-        }
-        self.increment();
+        let (args, required) = self.parse_function_arguments(TokenKind::Pipe)?;
+        self.consume(TokenKind::Pipe)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
-            let expr = self.parse_expression()?;
-            Rc::new(AST::Return(*expr.span(), expr))
+            self.parse_expression()?
         } else {
             self.parse_block(/*global*/ false)?
         };
@@ -210,42 +231,71 @@ impl Parser {
             span: start.extend(body.span()),
             name: None,
             args,
+            required,
+            in_class: false,
             body,
         }))
     }
+
+    // OLD VERSION
+    // fn parse_function(&mut self) -> Result<(Rc<AST>, String)> {
+    //     let start = self.consume(TokenKind::Def)?.span;
+    //     let name = self.consume(TokenKind::Identifier)?;
+    //     self.consume(TokenKind::LeftParen)?;
+    //     let mut args = vec![];
+    //     let mut seen_optional = false;
+    //     while self.cur().kind != TokenKind::RightParen {
+    //         let name = self.consume(TokenKind::Identifier)?.text;
+    //         let default = if self.cur().kind == TokenKind::Equals {
+    //             seen_optional = true;
+    //             self.increment();
+    //             Some(self.parse_expression()?)
+    //         } else {
+    //             if seen_optional {
+    //                 error!(
+    //                     self.cur().span,
+    //                     "Required argument cannot follow optional argument"
+    //                 );
+    //             }
+    //             None
+    //         };
+    //         args.push((name, default));
+    //         if self.cur().kind == TokenKind::Comma {
+    //             self.increment();
+    //         }
+    //     }
+    //     self.increment();
+    //     let body = if self.cur().kind == TokenKind::FatArrow {
+    //         self.increment();
+    //         let expr = self.parse_expression()?;
+    //         self.consume_line_end()?;
+    //         Rc::new(AST::Return(*expr.span(), expr))
+    //     } else {
+    //         self.parse_block(/*global*/ false)?
+    //     };
+    //     self.consume_line_end()?;
+    //     Ok((
+    //         Rc::new(AST::Function {
+    //             span: start.extend(body.span()),
+    //             name: Some(name.text.clone()),
+    //             args,
+    //             body,
+    //         }),
+    //         name.text,
+    //     ))
+    // }
 
     fn parse_function(&mut self) -> Result<(Rc<AST>, String)> {
         let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
-        let mut args = vec![];
-        let mut seen_optional = false;
-        while self.cur().kind != TokenKind::RightParen {
-            let name = self.consume(TokenKind::Identifier)?.text;
-            let default = if self.cur().kind == TokenKind::Equals {
-                seen_optional = true;
-                self.increment();
-                Some(self.parse_expression()?)
-            } else {
-                if seen_optional {
-                    error!(
-                        self.cur().span,
-                        "Required argument cannot follow optional argument"
-                    );
-                }
-                None
-            };
-            args.push((name, default));
-            if self.cur().kind == TokenKind::Comma {
-                self.increment();
-            }
-        }
-        self.increment();
+        let (args, required) = self.parse_function_arguments(RightParen)?;
+        self.consume(RightParen)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
             let expr = self.parse_expression()?;
             self.consume_line_end()?;
-            Rc::new(AST::Return(*expr.span(), expr))
+            expr
         } else {
             self.parse_block(/*global*/ false)?
         };
@@ -255,10 +305,80 @@ impl Parser {
                 span: start.extend(body.span()),
                 name: Some(name.text.clone()),
                 args,
+                required,
+                in_class: false,
                 body,
             }),
             name.text,
         ))
+    }
+
+    fn parse_function_arguments(&mut self, closer: TokenKind) -> Result<(FunctionArgs, usize)> {
+        let mut accepting: Vec<ArgumentType> = vec!(Positional, ArgumentType::Variadic, Keyword, VariadicKeyword);
+        let mut args: Vec<(String, Option<Rc<AST>>, ArgumentType)> = vec![];
+        let mut required: usize = 0;
+
+        while self.cur().kind != closer {
+            match self.cur().kind {
+                TokenKind::Star => {
+                    if accepting.contains(&ArgumentType::Variadic) {
+                        self.increment();
+                        accepting = vec!(Keyword, VariadicKeyword);
+
+                        let name = if self.cur().kind == TokenKind::Identifier {
+                            let name = self.consume(TokenKind::Identifier)?.text;
+                            Some(name)
+                        } else {
+                            None
+                        };
+
+                        args.push((name.unwrap_or("".to_string()), None, ArgumentType::Variadic));
+
+                    } else {
+                        error!(self.cur().span, "Positional variadic argument is not valid here");
+                    }
+                }
+                TokenKind::StarStar => {
+                    if accepting.contains(&VariadicKeyword) {
+                        self.increment();
+                        accepting = vec!();
+
+                        let name = if self.cur().kind == TokenKind::Identifier {
+                            let name = self.consume(TokenKind::Identifier)?.text;
+                            Some(name)
+                        } else {
+                            None
+                        };
+
+                        args.push((name.unwrap_or("".to_string()), None, VariadicKeyword));
+
+                    } else {
+                        error!(self.cur().span, "Keyword variadic argument is not valid here");
+                    }
+                }
+                _ => {
+                    if accepting.contains(&Positional) || accepting.contains(&Keyword) {
+                        let name = self.consume(TokenKind::Identifier)?.text;
+                        if self.cur().kind == TokenKind::Equals {
+                            self.increment();
+                            accepting = vec!(Keyword, VariadicKeyword);
+                            args.push((name, Some(self.parse_expression()?), Keyword));
+                        } else {
+                            args.push((name, None, Positional));
+                            required += 1;
+                        };
+                    } else {
+                        error!(self.cur().span, "Unexpected argument");
+                    }
+                }
+            }
+            if self.cur().kind == TokenKind::Comma {
+                self.increment();
+            } else {
+                break;
+            }
+        };
+        Ok((args, required))
     }
 
     fn parse_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
@@ -395,12 +515,12 @@ impl Parser {
                         Some(self.parse_expression()?)
                     };
                     self.consume(TokenKind::SemiColon)?;
-                    let step = if self.cur().kind == TokenKind::RightParen {
+                    let step = if self.cur().kind == RightParen {
                         None
                     } else {
                         Some(self.parse_expression()?)
                     };
-                    self.consume(TokenKind::RightParen)?;
+                    self.consume(RightParen)?;
                     let body = self.parse_block(/*global*/ false)?;
                     Ok(Rc::new(AST::For {
                         span: span.extend(body.span()),
@@ -772,42 +892,8 @@ impl Parser {
                     ..
                 } => {
                     self.increment();
-                    let mut args = vec![];
-                    let mut span = *val.span();
-                    loop {
-                        match self.cur().kind {
-                            TokenKind::RightParen => {
-                                span = span.extend(&self.cur().span);
-                                self.increment();
-                                break;
-                            }
-                            _ => {
-                                let mut arg = self.parse_expression()?;
-                                let mut label = None;
-                                if let AST::Variable(_, name) = &*arg {
-                                    if self.cur().kind == TokenKind::Colon {
-                                        label = Some(name.clone());
-                                        self.increment();
-                                        arg = self.parse_expression()?;
-                                    }
-                                }
-                                args.push((label, arg));
-                                match self.cur().kind {
-                                    TokenKind::Comma => self.increment(),
-                                    TokenKind::RightParen => {}
-                                    TokenKind::EOF => eof_error!(
-                                        self.cur().span,
-                                        "Expected `)` or ',' but got EOF"
-                                    ),
-                                    _ => error!(
-                                        self.cur().span,
-                                        "Expected `)` or `,` but got {:?}",
-                                        self.cur().kind
-                                    ),
-                                }
-                            }
-                        }
-                    }
+                    let args = self.parse_call_arguments(RightParen)?;
+                    let span = val.span().extend(&self.consume(RightParen)?.span);
                     val = Rc::new(AST::Call(span, val, args));
                 }
                 Token {
@@ -855,6 +941,24 @@ impl Parser {
         Ok(val)
     }
 
+    fn parse_call_arguments(&mut self, closer: TokenKind) -> Result<CallArgs> {
+        let mut args: CallArgs = vec![];  // Vec<(Option<String>, Rc<AST>)>
+        while self.cur().kind != closer {
+            let lhs = self.parse_expression()?;
+            if self.cur().kind == TokenKind::Colon {
+                self.increment();
+                let name = match lhs.as_ref() {
+                    AST::Variable(_, name) => name.to_string(),
+                    _ => error!(lhs.span(), "Expected identifier: key pair"),
+                };
+                args.push((Some(name), self.parse_expression()?));
+            } else {
+                args.push((None, lhs));
+            };
+        }
+        Ok(args)
+    }
+
     fn parse_atom(&mut self) -> Result<Rc<AST>> {
         match self.cur() {
             Token {
@@ -865,14 +969,14 @@ impl Parser {
                 self.increment();
                 let mut exprs = vec![];
                 let mut tup = false;
-                while self.cur().kind != TokenKind::RightParen {
+                while self.cur().kind != RightParen {
                     exprs.push(self.parse_expression()?);
                     match self.cur().kind {
                         TokenKind::Comma => {
                             self.increment();
                             tup = true;
                         }
-                        TokenKind::RightParen => {}
+                        RightParen => {}
                         TokenKind::EOF => {
                             eof_error!(self.cur().span, "Expected `)` or ',' but got EOF")
                         }
@@ -884,7 +988,7 @@ impl Parser {
                     }
                 }
                 let end = self.cur().span;
-                self.consume(TokenKind::RightParen)?;
+                self.consume(RightParen)?;
                 match exprs.len() {
                     1 if !tup => Ok(exprs.pop().unwrap()),
                     _ => Ok(Rc::new(AST::TupleLiteral(span.extend(&end), exprs))),
