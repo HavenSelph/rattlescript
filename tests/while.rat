@@ -1,0 +1,7 @@
+/// out: "1\n2\n3\n4\n5\n6"
+
+let x = 0
+while x < 6 {
+    x++
+    print(x)
+}
