@@ -603,7 +603,7 @@ impl Parser {
     }
 
     fn parse_additive(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_exponential()?;
+        let mut left = self.parse_multiplicative()?;
         while let Token {
             kind: TokenKind::Plus | TokenKind::Minus,
             ..
@@ -611,7 +611,7 @@ impl Parser {
         {
             let op = self.cur().kind;
             self.increment();
-            let right = self.parse_exponential()?;
+            let right = self.parse_multiplicative()?;
             left = match op {
                 TokenKind::Plus => {
                     Rc::new(AST::Plus(left.span().extend(right.span()), left, right))
@@ -625,33 +625,12 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_exponential(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_multiplicative()?;
-        while let Token {
-            kind: TokenKind::StarStar,
-            ..
-        } = self.cur()
-        {
-            let op = self.cur().kind;
-            self.increment();
-            let right = self.parse_multiplicative()?;
-            left = match op {
-                TokenKind::StarStar => {
-                    Rc::new(AST::Power(left.span().extend(right.span()), left, right))
-                }
-                _ => unreachable!(),
-            }
-        }
-        Ok(left)
-    }
-
     fn parse_multiplicative(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_prefix()?;
+        let mut left = self.parse_exponential()?;
 
         while let Token {
             kind:
                 TokenKind::Star
-                | TokenKind::StarStar
                 | TokenKind::Slash
                 | TokenKind::Percent,
             ..
@@ -659,7 +638,7 @@ impl Parser {
         {
             let op = self.cur().kind;
             self.increment();
-            let right = self.parse_prefix()?;
+            let right = self.parse_exponential()?;
             left = match op {
                 TokenKind::Star => {
                     Rc::new(AST::Multiply(left.span().extend(right.span()), left, right))
@@ -675,6 +654,27 @@ impl Parser {
         }
         Ok(left)
     }
+
+    fn parse_exponential(&mut self) -> Result<Rc<AST>> {
+        let mut left = self.parse_prefix()?;
+        while let Token {
+            kind: TokenKind::StarStar,
+            ..
+        } = self.cur()
+        {
+            let op = self.cur().kind;
+            self.increment();
+            let right = self.parse_exponential()?;
+            left = match op {
+                TokenKind::StarStar => {
+                    Rc::new(AST::Power(left.span().extend(right.span()), left, right))
+                }
+                _ => unreachable!(),
+            }
+        }
+        Ok(left)
+    }
+
 
     fn parse_slice_value(&mut self) -> Result<Option<Rc<AST>>> {
         match self.cur().kind {
