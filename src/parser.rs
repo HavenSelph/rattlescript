@@ -814,13 +814,19 @@ impl Parser {
                     kind: TokenKind::Dot,
                     ..
                 } => {
-                    self.increment();
-                    let name = self.consume(TokenKind::Identifier)?;
-                    val = Rc::new(AST::FieldAccess(
+                    while let Token {
+                        kind: TokenKind::Dot,
+                        ..
+                    } = self.cur()
+                    {
+                        self.increment();
+                        let name = self.consume(TokenKind::Identifier)?;
+                        val = Rc::new(AST::FieldAccess(
                         val.span().extend(&name.span),
                         val,
                         name.text.clone(),
-                    ));
+                        ));
+                    }
                 }
                 Token {
                     kind: TokenKind::DotDot,

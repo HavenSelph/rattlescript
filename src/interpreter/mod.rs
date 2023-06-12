@@ -174,110 +174,7 @@ impl Interpreter {
             }
             AST::FieldAccess(span, obj, field) => {
                 let obj = self.run(obj, scope)?;
-                match obj {
-                    Value::ClassInstance(instance) => match instance.borrow().fields.get(field) {
-                        Some(val) => val.clone(),
-                        None => {
-                            error!(span, "Field '{}' not found on class instance", field);
-                        }
-                    },
-                    Value::Array(_) => match field.as_str() {
-                        "len" => builtin!(len),
-                        "push" => builtin!(push),
-                        "pop" => builtin!(pop),
-                        "str" => builtin!(to_str),
-                        "iter" => builtin!(to_iter),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on array", field);
-                        }
-                    },
-                    Value::Tuple(_) => match field.as_str() {
-                        "len" => builtin!(len),
-                        "str" => builtin!(to_str),
-                        "iter" => builtin!(to_iter),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on tuple", field);
-                        }
-                    },
-                    Value::Float(_) => match field.as_str() {
-                        "int" => builtin!(to_int),
-                        "str" => builtin!(to_str),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on float", field);
-                        }
-                    },
-                    Value::Boolean(_) => match field.as_str() {
-                        "int" => builtin!(to_int),
-                        "str" => builtin!(to_str),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on boolean", field);
-                        }
-                    },
-                    Value::Integer(_) => match field.as_str() {
-                        "str" => builtin!(to_str),
-                        "float" => builtin!(to_float),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on integer", field);
-                        }
-                    },
-                    Value::String(_) => match field.as_str() {
-                        "len" => builtin!(len),
-                        "split" => builtin!(split),
-                        "int" => builtin!(to_int),
-                        "float" => builtin!(to_float),
-                        "iter" => builtin!(to_iter),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on string", field);
-                        }
-                    },
-                    Value::Dict(_) => match field.as_str() {
-                        "len" => builtin!(len),
-                        "str" => builtin!(to_str),
-                        "get" => builtin!(dict_get),
-                        "keys" => builtin!(dict_keys),
-                        "values" => builtin!(dict_values),
-                        "items" => builtin!(dict_items),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on dict", field);
-                        }
-                    },
-                    Value::Iterator(_) => match field.as_str() {
-                        "join" => builtin!(join),
-                        "enumerate" => builtin!(iter_enumerate),
-                        "to_array" => builtin!(to_array),
-                        "map" => builtin!(map),
-                        _ => {
-                            error!(span, "Field '{}' not found on iterator", field);
-                        }
-                    },
-                    Value::File(_) => match field.as_str() {
-                        "read" => builtin!(file_read),
-                        "write" => builtin!(file_write),
-                        _ => {
-                            error!(span, "Field '{}' not found on file", field);
-                        }
-                    },
-                    Value::Nothing => match field.as_str() {
-                        "str" => builtin!(to_str),
-                        "dbg" => builtin!(debug),
-                        _ => {
-                            error!(span, "Field '{}' not found on nothing", field);
-                        }
-                    },
-                    _ => {
-                        error!(
-                            span,
-                            "Cannot access field '{}' on non-class instance", field
-                        );
-                    }
-                }
+                obj.get_field(span, field)?
             }
             AST::Class {
                 span,
@@ -644,16 +541,22 @@ impl Interpreter {
         func: &Rc<AST>,
         args: &[(Option<String>, Rc<AST>)],
     ) -> Result<Value> {
-        let parent = match func.deref() {
-            AST::FieldAccess(_, left, ..) => Some(left),
-            _ => None,
+        let mut parent = None;
+
+        let callee = match func.deref() {
+            AST::FieldAccess(_, left, field) => {
+                let temp = self.run(left, scope.clone())?;
+                parent = Some(temp.clone());
+                temp.get_field(span, field)?
+            },
+            _ => {
+                self.run(func, scope.clone())?
+            }
         };
-        let callee = self.run(func, scope.clone())?;
         return Ok(match callee {
             Value::Function(func) => {
                 let new_scope = Scope::new(Some(func.borrow().scope.clone()), true);
                 if let Some(parent) = parent {
-                    let parent = self.run(parent, scope.clone())?;
                     new_scope.borrow_mut().insert("self", parent, false, span)?;
                 }
                 if args.len() > func.borrow().args.len() {
@@ -708,7 +611,6 @@ impl Interpreter {
                     .map(|(_, arg)| self.run(arg, scope.clone()))
                     .collect::<Result<Vec<_>>>()?;
                 if let Some(parent) = parent {
-                    let parent = self.run(parent, scope.clone())?;
                     args.insert(0, parent);
                 }
                 func.1.borrow()(self, scope, span, args)?

@@ -24,7 +24,7 @@ assert (1.2).int() == 1
 
 assert str(1) == "1"
 
-// Todo: fix this bug related to file reading and splitting on same line
-//let file = open("./tests/builtins.rat")
-//let lines = file.read().split("\n")
-//assert lines[0] == "/// exit: 0"
+let file = open("./tests/builtins.rat")
+let lines = file.read().split("\n")
+print(lines)
+assert lines[0].strip() == "/// exit: 0"

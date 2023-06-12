@@ -8,11 +8,6 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct IteratorValue(pub Ref<dyn Iterator<Item = Value>>);
 
-/*
-    FixMe: Iterator has a bug that causes it to run comprehensions a second
-    time when changing them into an iterator. Need to fix that.
- */
-
 
 struct RcChars {
     _rc: Rc<String>,
@@ -475,6 +470,114 @@ impl Value {
             }
             _ => error!(span, "Can only slice strings"),
         }
+    }
+
+    pub fn get_field(&self, span: &Span, field: &String) -> Result<Value> {
+        Ok(match self {
+            Value::ClassInstance(instance) => match instance.borrow().fields.get(field) {
+                Some(val) => val.clone(),
+                None => {
+                    error!(span, "Field '{}' not found on class instance", field);
+                }
+            },
+            Value::Array(_) => match field.as_str() {
+                "len" => builtin!(len),
+                "push" => builtin!(push),
+                "pop" => builtin!(pop),
+                "str" => builtin!(to_str),
+                "iter" => builtin!(to_iter),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on array", field);
+                }
+            },
+            Value::Tuple(_) => match field.as_str() {
+                "len" => builtin!(len),
+                "str" => builtin!(to_str),
+                "iter" => builtin!(to_iter),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on tuple", field);
+                }
+            },
+            Value::Float(_) => match field.as_str() {
+                "int" => builtin!(to_int),
+                "str" => builtin!(to_str),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on float", field);
+                }
+            },
+            Value::Boolean(_) => match field.as_str() {
+                "int" => builtin!(to_int),
+                "str" => builtin!(to_str),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on boolean", field);
+                }
+            },
+            Value::Integer(_) => match field.as_str() {
+                "str" => builtin!(to_str),
+                "float" => builtin!(to_float),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on integer", field);
+                }
+            },
+            Value::String(_) => match field.as_str() {
+                "len" => builtin!(len),
+                "split" => builtin!(split),
+                "int" => builtin!(to_int),
+                "float" => builtin!(to_float),
+                "iter" => builtin!(to_iter),
+                "dbg" => builtin!(debug),
+                "strip" => builtin!(strip),
+                _ => {
+                    error!(span, "Field '{}' not found on string", field);
+                }
+            },
+            Value::Dict(_) => match field.as_str() {
+                "len" => builtin!(len),
+                "str" => builtin!(to_str),
+                "get" => builtin!(dict_get),
+                "keys" => builtin!(dict_keys),
+                "values" => builtin!(dict_values),
+                "items" => builtin!(dict_items),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on dict", field);
+                }
+            },
+            Value::Iterator(_) => match field.as_str() {
+                "join" => builtin!(join),
+                "enumerate" => builtin!(iter_enumerate),
+                "to_array" => builtin!(to_array),
+                "map" => builtin!(map),
+                _ => {
+                    error!(span, "Field '{}' not found on iterator", field);
+                }
+            },
+            Value::File(_) => match field.as_str() {
+                "read" => builtin!(file_read),
+                "write" => builtin!(file_write),
+                _ => {
+                    error!(span, "Field '{}' not found on file", field);
+                }
+            },
+            Value::Nothing => match field.as_str() {
+                "str" => builtin!(to_str),
+                "dbg" => builtin!(debug),
+                _ => {
+                    error!(span, "Field '{}' not found on nothing", field);
+                }
+            },
+            _ => {
+                error!(
+                    span,
+                    "Cannot access field '{}' on non-class instance", field
+                );
+            }
+        })
     }
 
     pub fn negate(&self, span: &Span) -> Result<Value> {

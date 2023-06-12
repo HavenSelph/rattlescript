@@ -540,12 +540,6 @@ pub fn file_read(
     span: &Span,
     args: Vec<Value>,
 ) -> Result<Value> {
-    /*
-        FixMe: Running file.read().split("\n")
-        will return an empty string. However,
-        running file.read() and then splitting
-        the string will return the correct result.
-    */
 
     if args.len() != 1 {
         error!(span, "read() takes exactly one argument");
