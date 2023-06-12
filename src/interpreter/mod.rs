@@ -477,9 +477,17 @@ impl Interpreter {
                                     ),
                                 };
                             }
-                            vec.push(self.run(expr, loop_scope)?);
+                            let val = self.run(expr, loop_scope)?;
+                            match val {
+                                Value::Nothing => {}
+                                _ => vec.push(val),
+                            }
                         }
-                        Value::Array(make!(vec))
+                        if vec.is_empty() {
+                            Value::Nothing
+                        } else {
+                            Value::Array(make!(vec))
+                        }
                     }
                     _ => error!(iter.span(), "Comprehension target must be iterable"),
                 }
