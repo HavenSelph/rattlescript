@@ -252,6 +252,8 @@ impl Interpreter {
                     Value::Iterator(_) => match field.as_str() {
                         "join" => builtin!(join),
                         "enumerate" => builtin!(iter_enumerate),
+                        "to_array" => builtin!(to_array),
+                        "map" => builtin!(map),
                         _ => {
                             error!(span, "Field '{}' not found on iterator", field);
                         }
@@ -718,10 +720,10 @@ impl Interpreter {
                     .map(|(_, arg)| self.run(arg, scope.clone()))
                     .collect::<Result<Vec<_>>>()?;
                 if let Some(parent) = parent {
-                    let parent = self.run(parent, scope)?;
+                    let parent = self.run(parent, scope.clone())?;
                     args.insert(0, parent);
                 }
-                func.1.borrow()(span, args)?
+                func.1.borrow()(self, scope, span, args)?
             }
             Value::Class(class) => {
                 let _class = class.borrow();

@@ -1,7 +1,7 @@
 use crate::ast::AST;
 use crate::common::{get, make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::Scope;
+use crate::interpreter::{Interpreter, Scope};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -114,7 +114,7 @@ pub struct ClassInstance {
 }
 
 
-pub type BuiltInFunctionType = fn(&Span, Vec<Value>) -> Result<Value>;
+pub type BuiltInFunctionType = fn(&mut Interpreter, Ref<Scope>, &Span, Vec<Value>) -> Result<Value>;
 
 
 macro_rules! builtin {

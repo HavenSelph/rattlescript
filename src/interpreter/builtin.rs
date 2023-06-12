@@ -1,9 +1,90 @@
 use std::io::{Read,Write};
-use crate::common::{make, Span};
+use crate::common::{make, Span, Ref};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::Value;
+use crate::interpreter::value::{Value, ClassInstance};
+use crate::interpreter::{Interpreter, Scope, ControlFlow};
+use std::collections::HashMap;
 
-pub fn print(_span: &Span, args: Vec<Value>) -> Result<Value> {
+
+pub fn handle_call(interpreter: &mut Interpreter, scope: Ref<Scope>, span: &Span, callee: Value, args: Vec<Value>) -> Result<Value> {
+    Ok(match callee {
+        Value::Function(func) => {
+            let new_scope = Scope::new(Some(func.borrow().scope.clone()), true);
+            if args.len() > func.borrow().args.len() {
+                error!(
+                    span,
+                    "Function expected no more than {} arguments, got {}",
+                    func.borrow().args.len(),
+                    args.len()
+                )
+            } else {
+                let func = func.borrow();
+                for (i, (name, default)) in func.args.iter().enumerate() {
+                    if i < args.len() {
+                        new_scope.borrow_mut().insert(name, args[i].clone(), false, span)?;
+                    } else if let Some(default) = default {
+                        new_scope
+                            .borrow_mut()
+                            .insert(name, default.clone(), false, span)?;
+                    } else {
+                        error!(
+                            span,
+                            "Function argument {} is required, but not provided", name
+                        )
+                    }
+                }
+            }
+            let body = func.borrow().body.clone();
+            interpreter.run(&body, new_scope)?;
+            let value = if let ControlFlow::Return(value) = &interpreter.control_flow {
+                value.clone()
+            } else {
+                Value::Nothing
+            };
+            interpreter.control_flow = ControlFlow::None;
+            value
+        }
+        Value::BuiltInFunction(func) => {
+            func.1.borrow()(interpreter, scope, span, args)?
+        }
+        Value::Class(class) => {
+            let _class = class.borrow();
+            let mut fields: HashMap<String, Value> = HashMap::new();
+            for method in _class.methods.iter() {
+                fields.insert(method.0.clone(), method.1.clone());
+            }
+            if args.len() > _class.fields.len() {
+                error!(
+                    span,
+                    "Class expected no more than {:?} arguments, got {:?}",
+                    _class.fields.len(),
+                    args.len()
+                );
+            }
+            for (i, (name, default)) in _class.fields.iter().enumerate() {
+                if i < args.len() {
+                    let arg = &args[i];
+                    fields.insert(name.clone(), arg.clone());
+                } else if let Some(default) = default {
+                    fields.insert(name.clone(), default.clone());
+                } else {
+                    error!(
+                        span,
+                        "Class argument {} is required, but not provided", name
+                    );
+                }
+            }
+            Value::ClassInstance(make!(ClassInstance {
+                class: class.clone(),
+                fields
+            }))
+        }
+        x => error!(span, "Can't call object {:?}", x),
+    })
+}
+
+
+pub fn print(_interpreter: &mut Interpreter, _scope: Ref<Scope>, _span: &Span, args: Vec<Value>) -> Result<Value> {
     for (i, arg) in args.iter().enumerate() {
         if i != 0 {
             print!(" ");
@@ -14,14 +95,14 @@ pub fn print(_span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Nothing)
 }
 
-pub fn repr(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn repr(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "repr() takes exactly one argument");
     }
     Ok(Value::String(make!(args[0].repr())))
 }
 
-pub fn len(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn len(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "len() takes exactly one argument");
     }
@@ -35,7 +116,7 @@ pub fn len(span: &Span, args: Vec<Value>) -> Result<Value> {
     })
 }
 
-pub fn push(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn push(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 2 {
         error!(span, "push() takes exactly two arguments");
     }
@@ -48,7 +129,7 @@ pub fn push(span: &Span, args: Vec<Value>) -> Result<Value> {
     }
 }
 
-pub fn pop(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn pop(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "pop() takes exactly one argument");
     }
@@ -65,7 +146,7 @@ pub fn pop(span: &Span, args: Vec<Value>) -> Result<Value> {
 }
 
 
-pub fn exit(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn exit(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     let code = match args.get(0) {
         Some(val) => match val {
             Value::Integer(i) => *i,
@@ -80,7 +161,7 @@ pub fn exit(span: &Span, args: Vec<Value>) -> Result<Value> {
     }
 }
 
-pub fn input(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn input(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     let prompt = if args.len() == 1 {
         match &args[0] {
             Value::String(string) => string.borrow().clone(),
@@ -99,7 +180,7 @@ pub fn input(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::String(make!(input)))
 }
 
-pub fn dict_get(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn dict_get(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 2 {
         error!(span, "dict_get() takes exactly two arguments");
     }
@@ -115,7 +196,7 @@ pub fn dict_get(span: &Span, args: Vec<Value>) -> Result<Value> {
     }
 }
 
-pub fn dict_items(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn dict_items(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "dict_items() takes exactly one argument");
     }
@@ -131,7 +212,7 @@ pub fn dict_items(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Array(make!(items)))
 }
 
-pub fn dict_keys(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn dict_keys(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "dict_keys() takes exactly one argument");
     }
@@ -147,7 +228,7 @@ pub fn dict_keys(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Array(make!(keys)))
 }
 
-pub fn dict_values(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn dict_values(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "dict_values() takes exactly one argument");
     }
@@ -163,7 +244,7 @@ pub fn dict_values(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Array(make!(values)))
 }
 
-pub fn split(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn split(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 2 {
         error!(span, "split() takes exactly two arguments");
     }
@@ -182,7 +263,7 @@ pub fn split(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Array(make!(items)))
 }
 
-pub fn join(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn join(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 2 {
         error!(span, "join() takes exactly two arguments");
     }
@@ -227,7 +308,7 @@ pub fn to_int(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Integer(value))
 }
 
-pub fn to_float(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn to_float(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "float() takes exactly one argument");
     }
@@ -243,7 +324,7 @@ pub fn to_float(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Float(value))
 }
 
-pub fn to_str(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn to_str(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "str() takes exactly one argument");
     }
@@ -251,7 +332,7 @@ pub fn to_str(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::String(make!(value)))
 }
 
-pub fn to_iter(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn to_iter(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "iter() takes exactly one argument");
     }
@@ -274,7 +355,7 @@ pub fn iter_enumerate(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::Array(make!(items)))
 }
 
-pub fn file_open(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn file_open(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "open() takes exactly one argument");
     }
@@ -289,7 +370,7 @@ pub fn file_open(span: &Span, args: Vec<Value>) -> Result<Value> {
     Ok(Value::File(make!((path, file))))
 }
 
-pub fn file_read(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn file_read(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "read() takes exactly one argument");
     }
@@ -305,7 +386,7 @@ pub fn file_read(span: &Span, args: Vec<Value>) -> Result<Value> {
     }
 }
 
-pub fn file_write(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn file_write(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 2 {
         error!(span, "write() takes exactly two arguments");
     }
@@ -324,7 +405,7 @@ pub fn file_write(span: &Span, args: Vec<Value>) -> Result<Value> {
     }
 }
 
-pub fn debug(span: &Span, args: Vec<Value>) -> Result<Value> {
+pub fn debug(_interpreter: &mut Interpreter, _scope: Ref<Scope>, span: &Span, args: Vec<Value>) -> Result<Value> {
     if args.len() != 1 {
         error!(span, "debug() takes exactly one argument");
     }
