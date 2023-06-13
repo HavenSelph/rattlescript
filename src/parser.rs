@@ -935,7 +935,7 @@ impl Parser {
                             self.increment();
                             tup = true;
                         }
-                        RightParen => {},
+                        RightParen => {}
                         TokenKind::EOF => {
                             eof_error!(self.cur().span, "Expected `)` or ',' but got EOF")
                         }

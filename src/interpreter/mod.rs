@@ -632,7 +632,9 @@ impl Interpreter {
                         Some(name) => {
                             if seen.contains(name) {
                                 error!(span, "Duplicate keyword argument: `{}`", name);
-                            } else if run_scope.borrow().vars.contains_key(name) || need.contains(name) {
+                            } else if run_scope.borrow().vars.contains_key(name)
+                                || need.contains(name)
+                            {
                                 arguments.insert(name.to_string(), arg.clone());
                                 seen.push(name.clone());
                                 state = Keyword;
@@ -765,13 +767,7 @@ impl Interpreter {
                 };
                 match function {
                     Value::Function { .. } => {
-                        self.do_call(
-                            span,
-                            new_scope,
-                            Some(instance.clone()),
-                            function,
-                            args,
-                        )?;
+                        self.do_call(span, new_scope, Some(instance.clone()), function, args)?;
                     }
                     _ => error!(
                         span,
