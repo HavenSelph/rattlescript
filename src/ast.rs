@@ -1,7 +1,6 @@
 use crate::common::Span;
-use std::rc::Rc;
 use std::collections::HashMap;
-
+use std::rc::Rc;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ArgumentType {
