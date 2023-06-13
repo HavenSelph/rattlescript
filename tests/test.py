@@ -161,11 +161,14 @@ def main():
     else:
         run(["cargo", "build"])
     interpreter_path = Path().cwd() / 'target' / args.interpreter / 'rattlescript'
-    if not os.path.isfile(interpreter_path):
-        if not os.path.isfile(interpreter_path.with_suffix('.exe')):
-            raise FileNotFoundError(f'Could not find interpreter {args.interpreter} at {interpreter_path}')
-        else:
-            interpreter_path = interpreter_path.with_suffix('.exe')
+    if interpreter_path.with_suffix('.exe').exists():
+        print("[+] Assuming on Windows, .exe found")
+        interpreter_path = interpreter_path.with_suffix('.exe')
+    else:
+        print("[+] Assuming on Linux, no .exe found")
+    if not interpreter_path.exists():
+        print(f"[-] Interpreter {interpreter_path} not found")
+        exit(1)
     arg_files = args.files if isinstance(args.files, list) else [args.files]
     test_paths = [Path(pth) for pth in arg_files]
 
