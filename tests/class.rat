@@ -1,0 +1,19 @@
+/// exit: 0
+
+class TestClass {
+    class InnerClass {
+        def new(self, x, *ys) {
+            self.x = x
+            self.ys = ys
+        }
+    }
+
+    def new(self, a, b, c) {
+        self.a = a
+        self.b = b
+        self.c = c
+    }
+}
+
+
+print(TestClass.InnerClass)

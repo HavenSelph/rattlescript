@@ -1,5 +1,6 @@
 use crate::common::Span;
 use std::rc::Rc;
+use std::collections::HashMap;
 
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -33,8 +34,8 @@ pub enum AST {
     Class {
         span: Span,
         name: String,
-        fields: Vec<(String, Option<Rc<AST>>)>,
-        methods: Vec<(String, Rc<AST>)>,
+        parents: Option<Vec<String>>,
+        fields: HashMap<String, Rc<AST>>,
     },
     BooleanLiteral(Span, bool),
     Call(Span, Rc<AST>, CallArgs),

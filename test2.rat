@@ -1,5 +1,11 @@
-class player {
-    name,
-    age=1
+/// exit: 0
+
+class Test {
+    def new(self, *a) {
+        self.a = a
+        print("new!")
+    }
 }
 
+let t = Test(1, 2, 3)
+print(t.a)

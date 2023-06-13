@@ -1,8 +1,7 @@
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::{ClassInstance, Value};
-use crate::interpreter::{ControlFlow, Interpreter, Scope};
-use std::collections::HashMap;
+use crate::interpreter::value::{Value};
+use crate::interpreter::{Interpreter, Scope};
 use std::io::{Read, Write};
 use std::rc::Rc;
 
@@ -14,77 +13,9 @@ pub fn handle_call(
     args: Vec<Value>,
 ) -> Result<Value> {
     Ok(match callee {
-        Value::Function(func) => {
-            let new_scope = Scope::new(Some(func.borrow().scope.clone()), true);
-            if args.len() > func.borrow().args.len() {
-                error!(
-                    span,
-                    "Function expected no more than {} arguments, got {}",
-                    func.borrow().args.len(),
-                    args.len()
-                )
-            } else {
-                let func = func.borrow();
-                for (i, (name, default)) in func.args.iter().enumerate() {
-                    if i < args.len() {
-                        new_scope
-                            .borrow_mut()
-                            .insert(name, args[i].clone(), false, span)?;
-                    } else if let Some(default) = default {
-                        new_scope
-                            .borrow_mut()
-                            .insert(name, default.clone(), false, span)?;
-                    } else {
-                        error!(
-                            span,
-                            "Function argument {} is required, but not provided", name
-                        )
-                    }
-                }
-            }
-            let body = func.borrow().body.clone();
-            interpreter.run(&body, new_scope)?;
-            let value = if let ControlFlow::Return(value) = &interpreter.control_flow {
-                value.clone()
-            } else {
-                Value::Nothing
-            };
-            interpreter.control_flow = ControlFlow::None;
-            value
-        }
+        Value::Function(_) => error!(span, "Calling functions with built-in methods is not supported yet"),
         Value::BuiltInFunction(func) => func.1.borrow()(interpreter, scope, span, args)?,
-        Value::Class(class) => {
-            let _class = class.borrow();
-            let mut fields: HashMap<String, Value> = HashMap::new();
-            for method in _class.methods.iter() {
-                fields.insert(method.0.clone(), method.1.clone());
-            }
-            if args.len() > _class.fields.len() {
-                error!(
-                    span,
-                    "Class expected no more than {:?} arguments, got {:?}",
-                    _class.fields.len(),
-                    args.len()
-                );
-            }
-            for (i, (name, default)) in _class.fields.iter().enumerate() {
-                if i < args.len() {
-                    let arg = &args[i];
-                    fields.insert(name.clone(), arg.clone());
-                } else if let Some(default) = default {
-                    fields.insert(name.clone(), default.clone());
-                } else {
-                    error!(
-                        span,
-                        "Class argument {} is required, but not provided", name
-                    );
-                }
-            }
-            Value::ClassInstance(make!(ClassInstance {
-                class: class.clone(),
-                fields
-            }))
-        }
+        Value::Class(_) => error!(span, "Calling classes with built-in methods is not supported yet"),
         x => error!(span, "Can't call object {:?}", x),
     })
 }

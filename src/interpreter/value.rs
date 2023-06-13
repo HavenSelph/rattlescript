@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::ast::{AST, ArgumentType};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
@@ -71,7 +72,7 @@ impl Iterator for ArrayIterator {
 }
 
 struct DictIterator {
-    dict: Ref<std::collections::HashMap<Value, Value>>,
+    dict: Ref<HashMap<Value, Value>>,
     index: usize,
 }
 
@@ -103,7 +104,7 @@ impl IteratorValue {
         IteratorValue(make!(ArrayIterator { array, index: 0 }))
     }
 
-    pub fn for_dict(dict: Ref<std::collections::HashMap<Value, Value>>) -> IteratorValue {
+    pub fn for_dict(dict: Ref<HashMap<Value, Value>>) -> IteratorValue {
         IteratorValue(make!(DictIterator { dict, index: 0 }))
     }
 }
@@ -126,13 +127,15 @@ pub struct Function {
 pub struct Class {
     pub span: Span,
     pub name: String,
-    pub fields: Vec<(String, Option<Value>)>,
-    pub methods: Vec<(String, Value)>,
+    pub parents: Option<Ref<Vec<Value>>>,
+    pub fields: HashMap<String, Value>
 }
 
 pub struct ClassInstance {
-    pub class: Ref<Class>,
-    pub fields: std::collections::HashMap<String, Value>,
+    pub span: Span,
+    pub name: String,
+    pub parents: Option<Ref<Vec<Value>>>,
+    pub scope: Ref<Scope>,
 }
 
 pub type BuiltInFunctionType = fn(&mut Interpreter, Ref<Scope>, &Span, Vec<Value>) -> Result<Value>;
@@ -168,7 +171,7 @@ pub enum Value {
     Iterator(IteratorValue),
     Nothing,
     Range(i64, i64),
-    Dict(Ref<std::collections::HashMap<Value, Value>>),
+    Dict(Ref<HashMap<Value, Value>>),
     String(Rc<String>),
 }
 
@@ -223,8 +226,7 @@ impl std::fmt::Debug for Value {
             }
             Value::ClassInstance(instance) => {
                 let instance = instance.borrow();
-                let class = instance.class.borrow();
-                write!(f, "<instance of {}: {}>", class.name, class.span.0)
+                write!(f, "<class-instance {}>", instance.name)
             }
             Value::Array(array) => {
                 write!(f, "[")?;
@@ -475,12 +477,14 @@ impl Value {
 
     pub fn get_field(&self, span: &Span, field: &String) -> Result<Value> {
         Ok(match self {
-            Value::ClassInstance(instance) => match instance.borrow().fields.get(field) {
-                Some(val) => val.clone(),
-                None => {
-                    error!(span, "Field '{}' not found on class instance", field);
+            Value::ClassInstance(instance) => {
+                match instance.borrow().scope.borrow().get(field) {
+                    Some(value) => value,
+                    None => {
+                        error!(span, "Field '{}' not found on class instance", field);
+                    }
                 }
-            },
+            }
             Value::Array(_) => match field.as_str() {
                 "len" => builtin!(len),
                 "push" => builtin!(push),
@@ -674,7 +678,7 @@ impl Value {
             }
             Value::ClassInstance(inst) => {
                 let inst = inst.borrow();
-                format!("<instance of class {}>", inst.class.borrow().name)
+                format!("<class-instance {}>", inst.name)
             }
             Value::File(file) => format!("<file {}>", file.borrow().0),
             Value::Range(start, end) => format!("{}..{}", start, end),
@@ -786,8 +790,8 @@ impl Value {
     pub fn set_field(&self, field: &str, value: &Value, span: &Span) -> Result<()> {
         match self {
             Value::ClassInstance(inst) => {
-                let mut inst = inst.borrow_mut();
-                inst.fields.insert(field.to_string(), value.clone());
+                let inst = inst.borrow();
+                inst.scope.borrow_mut().insert(field, value.clone(), false, span)?;
             }
             _ => error!(span, "Can't set field on this type"),
         }
@@ -808,6 +812,26 @@ impl Value {
                 | Value::Range(..)
                 | Value::Nothing,
         )
+    }
+
+    pub fn type_of(&self) -> &str {
+        match self {
+            Value::Integer(..) => "Integer",
+            Value::Float(..) => "Float",
+            Value::String(..) => "String",
+            Value::Boolean(..) => "Boolean",
+            Value::Function(..) => "Function",
+            Value::Class(..) => "Class",
+            Value::ClassInstance(..) => "ClassInstance",
+            Value::File(..) => "File",
+            Value::Range(..) => "Range",
+            Value::BuiltInFunction(..) => "BuiltInFunction",
+            Value::Nothing => "Nothing",
+            Value::Array(..) => "Array",
+            Value::Tuple(..) => "Tuple",
+            Value::Dict(..) => "Dict",
+            Value::Iterator(..) => "Iterator",
+        }
     }
 }
 

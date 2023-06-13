@@ -1,4 +1,3 @@
 /// out: "1\n2\n3"
 
-
 [print(x) for x in 1..4].iter()

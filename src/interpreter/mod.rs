@@ -1,10 +1,11 @@
-use crate::ast::AST;
+use crate::ast::{ArgumentType, AST};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::{builtin, Class, ClassInstance, Function, IteratorValue, Value};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
+use crate::ast::ArgumentType::Keyword;
 
 mod builtin;
 pub mod value;
@@ -143,28 +144,40 @@ impl Interpreter {
             AST::Call(span, func, args) => self.handle_call(scope, span, func, args)?,
 
             AST::Function {
+                span,
                 name,
                 args,
+                required,
+                in_class,
                 body,
-                span,
-                ..
             } => {
-                for (name, _) in args {
-                    self.check_arg_name(name, span)?;
+                if *in_class {
+                    match args.get(0) {
+                        Some((name, ..)) => {
+                            if name != "self" {
+                                error!(span, "First argument of class method must be `self`");
+                            }
+                        },
+                        _ => {
+                            error!(span, "First argument of class method must be `self`");
+                        }
+                    }
                 }
                 let func = Value::Function(make!(Function {
                     span: *span,
                     name: name.clone().unwrap_or_else(|| "<anon>".to_string()),
                     args: args
                         .iter()
-                        .map(|(name, def)| (
+                        .map(|(name, default, argtype)| (
                             name.clone(),
-                            def.as_ref()
-                                .map(|def| self.run(def, scope.clone()).unwrap())
+                            default.as_ref()
+                                .map(|def| self.run(def, scope.clone()).unwrap()),
+                            *argtype,
                         ))
                         .collect(),
+                    required: *required,
                     body: body.clone(),
-                    scope: scope.clone(),
+                    scope: scope.clone()
                 }));
                 match name {
                     Some(name) => scope.borrow_mut().insert(name, func.clone(), false, span)?,
@@ -180,34 +193,44 @@ impl Interpreter {
                 span,
                 name,
                 fields,
-                methods,
+                parents,
             } => {
-                for (name, _) in fields {
-                    self.check_arg_name(name, span)?;
+                let parents: Option<Ref<Vec<Value>>> = match parents {
+                    Some(parents) => {
+                        let parent_vals: Ref<Vec<Value>> = make!(Vec::new());
+                        for parent in parents {
+                            let parent_val = scope.borrow().get(parent.as_str());
+                            match parent_val.clone() {
+                                Some(value) => {
+                                    match value {
+                                        Value::Class(_) => {}
+                                        _ => {
+                                            error!(span, "Classes may only inherit from other classes and not `{}`", value.type_of());
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    error!(span, "Parent class `{}` not found", parent);
+                                }
+                            }
+                            parent_vals.borrow_mut().push(parent_val.unwrap());
+                        }
+                        Some(parent_vals)
+                    },
+                    None => None
+                };
+                let mut field_vals: HashMap<String, Value> = HashMap::new();
+                for (name, definition) in fields {
+                    field_vals.insert(name.to_string(), self.run(definition, scope.clone())?);
                 }
-                let class_scope = Scope::new(Some(scope.clone()), false);
+
                 let class = Value::Class(make!(Class {
                     span: *span,
                     name: name.clone(),
-                    fields: fields
-                        .iter()
-                        .map(|(name, def)| (
-                            name.clone(),
-                            def.as_ref()
-                                .map(|def| self.run(def, class_scope.clone()).unwrap())
-                        ))
-                        .collect(),
-                    methods: methods
-                        .iter()
-                        .map(|(name, func)| {
-                            let func = self.run(func, class_scope.clone()).expect("function");
-                            (name.clone(), func)
-                        })
-                        .collect()
+                    parents,
+                    fields: field_vals,
                 }));
-                scope
-                    .borrow_mut()
-                    .insert(name, class.clone(), false, span)?;
+                scope.borrow_mut().insert(name, class.clone(), false, span)?;
                 class
             }
             AST::Slice {
@@ -527,8 +550,8 @@ impl Interpreter {
     fn check_arg_name(&self, name: &str, span: &Span) -> Result<()> {
         if name == "self" {
             error!(span, "Argument name can't be `self`")
-        // } else if self.builtins.contains_key(name) {
-        //     error!(span, "Argument name can't be a built-in function name")
+            // } else if self.builtins.contains_key(name) {
+            //     error!(span, "Argument name can't be a built-in function name")
         } else {
             Ok(())
         }
@@ -553,50 +576,160 @@ impl Interpreter {
                 self.run(func, scope.clone())?
             }
         };
-        return Ok(match callee {
+        return Ok(match callee.clone() {
             Value::Function(func) => {
                 let new_scope = Scope::new(Some(func.borrow().scope.clone()), true);
                 if let Some(parent) = parent {
                     new_scope.borrow_mut().insert("self", parent, false, span)?;
                 }
-                if args.len() > func.borrow().args.len() {
-                    error!(
-                        span,
-                        "Function expected no more than {} arguments, got {}",
-                        func.borrow().args.len(),
-                        args.len()
-                    )
-                } else {
-                    let func = func.borrow();
-                    for (i, (name, default)) in func.args.iter().enumerate() {
-                        if i < args.len() {
-                            let (label, arg) = &args[i];
-                            let arg = self.run(arg, scope.clone())?;
-                            if let Some(label) = label {
-                                if label != name {
-                                    error!(
-                                        span,
-                                        "Function argument {} is required, but {} was provided",
-                                        name,
-                                        label
-                                    )
-                                }
+
+                let func = func.borrow();
+                let mut variadic_name = None;
+                let mut variadic_keyword_name = None;
+
+                let mut need: Vec<String> = Vec::new();
+                let mut seen: Vec<String> = Vec::new();
+                let mut arguments: HashMap<String, Value> = HashMap::new();
+                let mut variadic: Vec<Value> = Vec::new();
+                let mut variadic_keyword: HashMap<Value, Value> = HashMap::new();
+
+                for (name, arg, argtype) in func.args.iter() {
+                    match argtype {
+                        ArgumentType::Positional => {
+                            need.push(name.to_string())
+                        }
+                        Keyword => {
+                            new_scope.borrow_mut().insert(name, arg.clone().expect("Keywords always have default values."), false, span)?;
+                        },
+                        ArgumentType::Variadic => {
+                            variadic_name = Some(name);
+                        },
+                        ArgumentType::VariadicKeyword => {
+                            variadic_keyword_name = Some(name);
+                        },
+                    };
+                }
+
+                let mut state = ArgumentType::Positional;
+                for (i, (name, arg)) in args.iter().enumerate() {
+                    match name {
+                        Some(name) => {
+                            if seen.contains(name) {
+                                error!(span, "Duplicate keyword argument: `{}`", name);
+                            } else if new_scope.borrow().vars.contains_key(name) || need.contains(name) {
+                                arguments.insert(name.to_string(), self.run(arg, scope.clone())?);
+                                seen.push(name.clone());
+                                state = Keyword;
+                            } else if variadic_keyword_name.is_some() {
+                                variadic_keyword.insert(Value::String(Rc::new(name.clone())), self.run(arg, scope.clone())?);
+                                seen.push(name.clone());
+                                state = Keyword;
+                            } else {
+                                error!(span, "Unexpected keyword argument: `{}`", name);
                             }
-                            new_scope.borrow_mut().insert(name, arg, false, span)?;
-                        } else if let Some(default) = default {
-                            new_scope
-                                .borrow_mut()
-                                .insert(name, default.clone(), false, span)?;
-                        } else {
-                            error!(
-                                span,
-                                "Function argument {} is required, but not provided", name
-                            )
+                        },
+                        None => {
+                            if i < func.required {
+                                if state != ArgumentType::Positional {
+                                    error!(span, "Positional arguments must be the first provided.");
+                                }
+                                let (name, ..) = func.args.get(i).unwrap();
+                                arguments.insert(name.to_string(), self.run(arg, scope.clone())?);
+                                seen.push(name.clone());
+                            } else if variadic_name.is_some() {
+                                if state != ArgumentType::Variadic && state != ArgumentType::Positional {
+                                    error!(span, "Variadic arguments must be the last provided.");
+                                }
+                                variadic.push(self.run(arg, scope.clone())?);
+                                state = ArgumentType::Variadic;
+                            } else {
+                                error!(span, "Unexpected positional argument");
+                            }
                         }
                     }
                 }
+
+                // Check if all required arguments are provided
+                for (name, ..) in func.args.iter() {
+                    if !seen.contains(name) {
+                        error!(span, "Missing required argument: `{}`", name);
+                    }
+                }
+
+                if let Some(variadic_name) = variadic_name {
+                    arguments.insert(variadic_name.to_string(), Value::Array(make!(variadic)));
+                }
+
+                if let Some(variadic_keyword_name) = variadic_keyword_name {
+                    arguments.insert(variadic_keyword_name.to_string(), Value::Dict(make!(variadic_keyword)));
+                }
+
+                self.do_call(span, new_scope, callee, arguments)?
+            }
+            Value::BuiltInFunction(func) => {
+                let mut args = args
+                    .iter()
+                    .map(|(_, arg, ..)| self.run(arg, scope.clone()))
+                    .collect::<Result<Vec<_>>>()?;
+                if let Some(parent) = parent {
+                    args.insert(0, parent);
+                }
+                func.1.borrow()(self, scope, span, args)?
+            }
+            Value::Class(_class) => {
+                let class = _class.borrow();
+                let c_span = class.span;
+                let name = class.name.clone();
+                let parents = class.parents.clone();
+                let fields = class.fields.clone();
+
+                let new_scope = Scope::new(Some(scope), false);
+
+                // Handle parent fields
+                if let Some(parents) = parents {
+                    for parent in parents.borrow().iter() {
+                        match parent {
+                            Value::Class(parent) => {
+                                let parent = parent.borrow();
+                                for (name, value) in parent.fields.iter() {
+                                    new_scope.borrow_mut().insert(name, value.clone(), false, span)?;
+                                }
+                            },
+                            _ => unimplemented!()
+                        }
+                    }
+                }
+
+                // Handle class fields
+                for (name, value) in fields.iter() {
+                    new_scope.borrow_mut().insert(name, value.clone(), false, span)?;
+                }
+
+                let instance = ClassInstance {span: c_span, name, parents: class.parents.clone(), scope: new_scope.clone()};
+
+                // Call new if it exists
+                match new_scope.borrow().get("new") {
+                    Some(Value::Function(func)) => {
+                        self.handle_call(span, new_scope.clone(), Value::Function(func), args.clone())?;
+                    },
+                    _ => {}
+                }
+
+                Value::ClassInstance(make!(instance))
+            }
+            x => error!(span, "Can't call object {:?}", x),
+        });
+    }
+
+    pub fn do_call(&mut self, span: &Span, scope: Ref<Scope>, obj: Value, args: HashMap<String, Value>) -> Result<Value> {
+        Ok(match obj {
+            Value::Function(func) => {
+                for key in args.keys() {
+                    scope.borrow_mut().insert(key, args.get(key).unwrap().clone(), false, span)?;
+                }
+
                 let body = func.borrow().body.clone();
-                self.run(&body, new_scope)?;
+                self.run(&body, scope)?;
                 let value = if let ControlFlow::Return(value) = &self.control_flow {
                     value.clone()
                 } else {
@@ -604,54 +737,10 @@ impl Interpreter {
                 };
                 self.control_flow = ControlFlow::None;
                 value
+            },
+            _ => {
+                error!(span, "Can't call object {:?}", obj)
             }
-            Value::BuiltInFunction(func) => {
-                let mut args = args
-                    .iter()
-                    .map(|(_, arg)| self.run(arg, scope.clone()))
-                    .collect::<Result<Vec<_>>>()?;
-                if let Some(parent) = parent {
-                    args.insert(0, parent);
-                }
-                func.1.borrow()(self, scope, span, args)?
-            }
-            Value::Class(class) => {
-                let _class = class.borrow();
-                let mut fields: HashMap<String, Value> = HashMap::new();
-                for method in _class.methods.iter() {
-                    fields.insert(method.0.clone(), method.1.clone());
-                }
-                let args = args
-                    .iter()
-                    .map(|(_, arg)| self.run(arg, scope.clone()))
-                    .collect::<Result<Vec<_>>>()?;
-                if args.len() > _class.fields.len() {
-                    error!(
-                        span,
-                        "Class expected no more than {:?} arguments, got {:?}",
-                        _class.fields.len(),
-                        args.len()
-                    );
-                }
-                for (i, (name, default)) in _class.fields.iter().enumerate() {
-                    if i < args.len() {
-                        let arg = &args[i];
-                        fields.insert(name.clone(), arg.clone());
-                    } else if let Some(default) = default {
-                        fields.insert(name.clone(), default.clone());
-                    } else {
-                        error!(
-                            span,
-                            "Class argument {} is required, but not provided", name
-                        );
-                    }
-                }
-                Value::ClassInstance(make!(ClassInstance {
-                    class: class.clone(),
-                    fields
-                }))
-            }
-            x => error!(span, "Can't call object {:?}", x),
-        });
+        })
     }
 }
