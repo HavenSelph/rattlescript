@@ -53,7 +53,6 @@ impl Parser {
     }
 
     fn consume_line_end(&mut self) -> Result<()> {
-        println!("consume_line_end: {:?}", self.cur());
         if self.cur().newline_before {
             return Ok(());
         }
@@ -213,20 +212,17 @@ impl Parser {
     }
 
     fn parse_function(&mut self, in_class: bool) -> Result<Rc<AST>> {
-        println!("parse_function");
         let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
         let (args, required) = self.parse_function_arguments(RightParen, in_class)?;
         self.consume(RightParen)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
-            println!("parse_function: fat arrow");
             self.increment();
             let expr = self.parse_expression()?;
             self.consume_line_end()?;
             Rc::new(AST::Return(*expr.span(), expr))
         } else {
-            println!("parse_function: block");
             self.parse_block(/*global*/ false)?
         };
         self.consume_line_end()?;
@@ -252,6 +248,7 @@ impl Parser {
         let mut found_self = !in_class;
 
         while self.cur().kind != closer {
+            let mut span = self.cur().span;
             match self.cur().kind {
                 TokenKind::Star => {
                     if accepting.contains(&ArgumentType::Variadic) {
@@ -259,6 +256,7 @@ impl Parser {
                         accepting = vec![Keyword, VariadicKeyword];
 
                         let name = if self.cur().kind == TokenKind::Identifier {
+                            span = span.extend(&self.cur().span);
                             let name = self.consume(TokenKind::Identifier)?.text;
                             Some(name)
                         } else {
@@ -279,6 +277,7 @@ impl Parser {
                         accepting = vec![];
 
                         let name = if self.cur().kind == TokenKind::Identifier {
+                            span = span.extend(&self.cur().span);
                             let name = self.consume(TokenKind::Identifier)?.text;
                             Some(name)
                         } else {
@@ -297,10 +296,12 @@ impl Parser {
                     if accepting.contains(&Positional) || accepting.contains(&Keyword) {
                         let name = self.consume(TokenKind::Identifier)?.text;
                         if self.cur().kind == TokenKind::Equals {
+                            span = span.extend(&self.cur().span);
                             self.increment();
                             accepting = vec![Keyword, VariadicKeyword];
                             args.push((name, Some(self.parse_expression()?), Keyword));
                         } else {
+                            span = span.extend(&self.cur().span);
                             args.push((name, None, Positional));
                             required += 1;
                         };
@@ -310,7 +311,7 @@ impl Parser {
                 }
             }
             if !found_self && in_class && args[0].0 != "self" {
-                error!(self.cur().span, "First argument must be 'self'");
+                error!(span, "First argument must be 'self'");
             } else if !found_self && in_class {
                 found_self = true;
                 args.pop();
@@ -320,6 +321,9 @@ impl Parser {
             } else {
                 break;
             }
+        }
+        if in_class {
+            required -= 1;
         }
         Ok((args, required))
     }
