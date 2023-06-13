@@ -1,14 +1,13 @@
-use std::collections::HashMap;
-use crate::ast::{AST, ArgumentType};
+use crate::ast::{ArgumentType, AST};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Interpreter, Scope};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct IteratorValue(pub Ref<dyn Iterator<Item = Value>>);
-
 
 struct RcChars {
     _rc: Rc<String>,
@@ -37,7 +36,6 @@ impl RcChars {
         new
     }
 }
-
 
 struct StringIterator {
     data: RcChars,
@@ -93,7 +91,9 @@ impl Iterator for DictIterator {
 
 impl IteratorValue {
     pub fn for_string(data: Rc<String>) -> IteratorValue {
-        IteratorValue(make!(StringIterator { data: RcChars::from_rc(data) }))
+        IteratorValue(make!(StringIterator {
+            data: RcChars::from_rc(data)
+        }))
     }
 
     pub fn for_range(start: &i64, end: &i64) -> IteratorValue {
@@ -128,7 +128,7 @@ pub struct Class {
     pub span: Span,
     pub name: String,
     pub parents: Option<Ref<Vec<Value>>>,
-    pub fields: HashMap<String, Value>
+    pub fields: HashMap<String, Value>,
 }
 
 pub struct ClassInstance {
@@ -138,6 +138,7 @@ pub struct ClassInstance {
     pub scope: Ref<Scope>,
 }
 
+pub type CallArgValues = Vec<(Option<String>, Value)>;
 pub type BuiltInFunctionType = fn(&mut Interpreter, Ref<Scope>, &Span, Vec<Value>) -> Result<Value>;
 
 macro_rules! builtin {
@@ -477,14 +478,12 @@ impl Value {
 
     pub fn get_field(&self, span: &Span, field: &String) -> Result<Value> {
         Ok(match self {
-            Value::ClassInstance(instance) => {
-                match instance.borrow().scope.borrow().get(field) {
-                    Some(value) => value,
-                    None => {
-                        error!(span, "Field '{}' not found on class instance", field);
-                    }
+            Value::ClassInstance(instance) => match instance.borrow().scope.borrow().get(field) {
+                Some(value) => value,
+                None => {
+                    error!(span, "Field '{}' not found on class instance", field);
                 }
-            }
+            },
             Value::Array(_) => match field.as_str() {
                 "len" => builtin!(len),
                 "push" => builtin!(push),
@@ -737,12 +736,10 @@ impl Value {
 
     pub fn index(&self, index: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, index) {
-            (Value::String(s), Value::Integer(index)) => {
-                match s.chars().nth(*index as usize) {
-                    Some(c) => Value::String(Rc::new(c.to_string())),
-                    None => error!(span, "Index out of bounds"),
-                }
-            }
+            (Value::String(s), Value::Integer(index)) => match s.chars().nth(*index as usize) {
+                Some(c) => Value::String(Rc::new(c.to_string())),
+                None => error!(span, "Index out of bounds"),
+            },
             (Value::Array(arr), Value::Integer(index)) => match arr.borrow().get(*index as usize) {
                 Some(v) => v.clone(),
                 None => error!(span, "Index out of bounds"),
@@ -791,9 +788,11 @@ impl Value {
         match self {
             Value::ClassInstance(inst) => {
                 let inst = inst.borrow();
-                inst.scope.borrow_mut().insert(field, value.clone(), false, span)?;
+                inst.scope
+                    .borrow_mut()
+                    .insert(field, value.clone(), false, span)?;
             }
-            _ => error!(span, "Can't set field on this type"),
+            _ => error!(span, "Can't set field on {:?}", self),
         }
         Ok(())
     }

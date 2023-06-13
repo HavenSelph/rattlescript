@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use crate::ast::{ArgumentType, AST, CallArgs, FunctionArgs};
+use crate::ast::ArgumentType::{Keyword, Positional, VariadicKeyword};
+use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST};
 use crate::error::{eof_error, parser_error as error, Result};
-use crate::token::{Token, TokenKind};
-use std::rc::Rc;
-use crate::ast::ArgumentType::{Keyword, VariadicKeyword, Positional};
 use crate::token::TokenKind::RightParen;
+use crate::token::{Token, TokenKind};
+use std::collections::HashMap;
+use std::rc::Rc;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -53,6 +53,7 @@ impl Parser {
     }
 
     fn consume_line_end(&mut self) -> Result<()> {
+        println!("consume_line_end: {:?}", self.cur());
         if self.cur().newline_before {
             return Ok(());
         }
@@ -143,10 +144,9 @@ impl Parser {
                         }
                         _ => unreachable!(),
                     }
-                },
+                }
                 TokenKind::Def => {
                     let func = self.parse_function(true)?;
-
                     match func.as_ref() {
                         AST::Function { span, name, .. } => {
                             if fields.contains_key(name.clone().unwrap().as_str()) {
@@ -156,13 +156,33 @@ impl Parser {
                         }
                         _ => unreachable!(),
                     }
-                },
+                }
+                TokenKind::Identifier => {
+                    let assignment = self.parse_assignment()?;
+                    match assignment.as_ref() {
+                        AST::Assignment {
+                            0: span,
+                            1: lhs,
+                            2: val,
+                        } => match lhs.as_ref() {
+                            AST::Variable { 0: span, 1: text } => {
+                                if fields.contains_key(text.as_str()) {
+                                    error!(span, "Duplicate field name");
+                                }
+                                fields.insert(text.clone(), val.clone());
+                            }
+                            _ => error!(span, "Expected variable name not {:?}", name),
+                        },
+                        _ => unreachable!(),
+                    }
+                }
                 _ => {
                     error!(self.cur().span, "Expected class or function declaration");
                 }
             }
         }
         let end = self.consume(TokenKind::RightBrace)?.span;
+        self.consume_line_end()?;
         Ok(Rc::new(AST::Class {
             span: start.extend(&end),
             name: name.text,
@@ -173,15 +193,12 @@ impl Parser {
 
     fn parse_lambda(&mut self) -> Result<Rc<AST>> {
         let start = self.consume(TokenKind::Pipe)?.span;
-        let (args, required) = self.parse_function_arguments(TokenKind::Pipe)?;
+        let (args, required) = self.parse_function_arguments(TokenKind::Pipe, false)?;
         self.consume(TokenKind::Pipe)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
             let expr = self.parse_expression()?;
-            Rc::new(AST::Return(
-                *expr.span(),
-                expr,
-            ))
+            Rc::new(AST::Return(*expr.span(), expr))
         } else {
             self.parse_block(/*global*/ false)?
         };
@@ -196,44 +213,50 @@ impl Parser {
     }
 
     fn parse_function(&mut self, in_class: bool) -> Result<Rc<AST>> {
+        println!("parse_function");
         let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
-        let (args, required) = self.parse_function_arguments(RightParen)?;
+        let (args, required) = self.parse_function_arguments(RightParen, in_class)?;
         self.consume(RightParen)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
+            println!("parse_function: fat arrow");
             self.increment();
             let expr = self.parse_expression()?;
             self.consume_line_end()?;
-            Rc::new(AST::Return(
-                *expr.span(),
-                expr,
-            ))
+            Rc::new(AST::Return(*expr.span(), expr))
         } else {
+            println!("parse_function: block");
             self.parse_block(/*global*/ false)?
         };
         self.consume_line_end()?;
         Ok(Rc::new(AST::Function {
-                span: start.extend(body.span()),
-                name: Some(name.text),
-                args,
-                required,
-                in_class,
-                body,
+            span: start.extend(body.span()),
+            name: Some(name.text),
+            args,
+            required,
+            in_class,
+            body,
         }))
     }
 
-    fn parse_function_arguments(&mut self, closer: TokenKind) -> Result<(FunctionArgs, usize)> {
-        let mut accepting: Vec<ArgumentType> = vec!(Positional, ArgumentType::Variadic, Keyword, VariadicKeyword);
-        let mut args: Vec<(String, Option<Rc<AST>>, ArgumentType)> = vec![];
+    fn parse_function_arguments(
+        &mut self,
+        closer: TokenKind,
+        in_class: bool,
+    ) -> Result<(FunctionArgs, usize)> {
+        let mut accepting: Vec<ArgumentType> =
+            vec![Positional, ArgumentType::Variadic, Keyword, VariadicKeyword];
+        let mut args: FunctionArgs = vec![]; // (name, default, type)
         let mut required: usize = 0;
+        let mut found_self = !in_class;
 
         while self.cur().kind != closer {
             match self.cur().kind {
                 TokenKind::Star => {
                     if accepting.contains(&ArgumentType::Variadic) {
                         self.increment();
-                        accepting = vec!(Keyword, VariadicKeyword);
+                        accepting = vec![Keyword, VariadicKeyword];
 
                         let name = if self.cur().kind == TokenKind::Identifier {
                             let name = self.consume(TokenKind::Identifier)?.text;
@@ -243,15 +266,17 @@ impl Parser {
                         };
 
                         args.push((name.unwrap_or("".to_string()), None, ArgumentType::Variadic));
-
                     } else {
-                        error!(self.cur().span, "Positional variadic argument is not valid here");
+                        error!(
+                            self.cur().span,
+                            "Positional variadic argument is not valid here"
+                        );
                     }
                 }
                 TokenKind::StarStar => {
                     if accepting.contains(&VariadicKeyword) {
                         self.increment();
-                        accepting = vec!();
+                        accepting = vec![];
 
                         let name = if self.cur().kind == TokenKind::Identifier {
                             let name = self.consume(TokenKind::Identifier)?.text;
@@ -261,9 +286,11 @@ impl Parser {
                         };
 
                         args.push((name.unwrap_or("".to_string()), None, VariadicKeyword));
-
                     } else {
-                        error!(self.cur().span, "Keyword variadic argument is not valid here");
+                        error!(
+                            self.cur().span,
+                            "Keyword variadic argument is not valid here"
+                        );
                     }
                 }
                 _ => {
@@ -271,7 +298,7 @@ impl Parser {
                         let name = self.consume(TokenKind::Identifier)?.text;
                         if self.cur().kind == TokenKind::Equals {
                             self.increment();
-                            accepting = vec!(Keyword, VariadicKeyword);
+                            accepting = vec![Keyword, VariadicKeyword];
                             args.push((name, Some(self.parse_expression()?), Keyword));
                         } else {
                             args.push((name, None, Positional));
@@ -282,12 +309,18 @@ impl Parser {
                     }
                 }
             }
+            if !found_self && in_class && args[0].0 != "self" {
+                error!(self.cur().span, "First argument must be 'self'");
+            } else if !found_self && in_class {
+                found_self = true;
+                args.pop();
+            }
             if self.cur().kind == TokenKind::Comma {
                 self.increment();
             } else {
                 break;
             }
-        };
+        }
         Ok((args, required))
     }
 
@@ -752,6 +785,9 @@ impl Parser {
 
     fn parse_postfix(&mut self) -> Result<Rc<AST>> {
         let mut val = self.parse_atom()?;
+        if self.cur().newline_before {
+            return Ok(val);
+        }
         loop {
             match self.cur() {
                 Token {
@@ -822,9 +858,9 @@ impl Parser {
                         self.increment();
                         let name = self.consume(TokenKind::Identifier)?;
                         val = Rc::new(AST::FieldAccess(
-                        val.span().extend(&name.span),
-                        val,
-                        name.text.clone(),
+                            val.span().extend(&name.span),
+                            val,
+                            name.text.clone(),
                         ));
                     }
                 }
@@ -856,7 +892,7 @@ impl Parser {
     }
 
     fn parse_call_arguments(&mut self, closer: TokenKind) -> Result<CallArgs> {
-        let mut args: CallArgs = vec![];  // Vec<(Option<String>, Rc<AST>)>
+        let mut args: CallArgs = vec![]; // Vec<(Option<String>, Rc<AST>)>
         while self.cur().kind != closer {
             let lhs = self.parse_expression()?;
             if self.cur().kind == TokenKind::Colon {
@@ -895,7 +931,7 @@ impl Parser {
                             self.increment();
                             tup = true;
                         }
-                        RightParen => {}
+                        RightParen => {},
                         TokenKind::EOF => {
                             eof_error!(self.cur().span, "Expected `)` or ',' but got EOF")
                         }

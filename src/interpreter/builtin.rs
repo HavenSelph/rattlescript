@@ -1,24 +1,9 @@
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
-use crate::interpreter::value::{Value};
+use crate::interpreter::value::{CallArgValues, Value};
 use crate::interpreter::{Interpreter, Scope};
 use std::io::{Read, Write};
 use std::rc::Rc;
-
-pub fn handle_call(
-    interpreter: &mut Interpreter,
-    scope: Ref<Scope>,
-    span: &Span,
-    callee: Value,
-    args: Vec<Value>,
-) -> Result<Value> {
-    Ok(match callee {
-        Value::Function(_) => error!(span, "Calling functions with built-in methods is not supported yet"),
-        Value::BuiltInFunction(func) => func.1.borrow()(interpreter, scope, span, args)?,
-        Value::Class(_) => error!(span, "Calling classes with built-in methods is not supported yet"),
-        x => error!(span, "Can't call object {:?}", x),
-    })
-}
 
 pub fn print(
     _interpreter: &mut Interpreter,
@@ -281,7 +266,9 @@ pub fn strip(
         " \t\n\r".to_string()
     };
 
-    Ok(Value::String(Rc::new(string.trim_matches(|c| chars.contains(c)).to_string())))
+    Ok(Value::String(Rc::new(
+        string.trim_matches(|c| chars.contains(c)).to_string(),
+    )))
 }
 
 pub fn join(
@@ -348,14 +335,8 @@ pub fn map(
     let mut result = Vec::new();
     let iter = &mut *(*iter.0).borrow_mut();
     for item in iter {
-        let value = handle_call(
-            interpreter,
-            scope.clone(),
-            span,
-            function.clone(),
-            vec![item.clone()],
-        )?;
-        result.push(value);
+        let args: CallArgValues = vec![(None, item.clone())];
+        result.push(interpreter.do_call(span, scope.clone(), None, function.clone(), &args)?);
     }
     Value::Array(make!(result)).iterator(span)
 }
@@ -496,7 +477,6 @@ pub fn file_read(
     span: &Span,
     args: Vec<Value>,
 ) -> Result<Value> {
-
     if args.len() != 1 {
         error!(span, "read() takes exactly one argument");
     }

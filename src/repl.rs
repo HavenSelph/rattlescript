@@ -9,7 +9,7 @@ use std::rc::Rc;
 pub struct Repl {
     interpreter: Interpreter,
     global_scope: Ref<Scope>,
-    verbose: bool
+    verbose: bool,
 }
 
 impl Repl {
@@ -19,7 +19,7 @@ impl Repl {
         Repl {
             interpreter,
             global_scope,
-            verbose
+            verbose,
         }
     }
 
