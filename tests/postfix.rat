@@ -1,0 +1,6 @@
+/// exit: 0
+// This was a bug that caused the parser to assume that the list comp was a postfix.
+// It was fixed by adding a check for whether the current token had a newline before it.
+
+let x = 10
+[y for y in 0..12]

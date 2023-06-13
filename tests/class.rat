@@ -1,4 +1,4 @@
-/// exit: 0
+/// out: "1\n3"
 
 class TestClass {
     class InnerClass {
@@ -16,4 +16,5 @@ class TestClass {
 }
 
 
-print(TestClass.InnerClass)
+print(TestClass(1, 2, 3).a)
+print(TestClass(1, 3, 4).b)

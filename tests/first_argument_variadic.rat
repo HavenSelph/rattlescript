@@ -1,0 +1,8 @@
+/// out: "3"
+
+
+class Test {
+    def func(self, *a) => a
+}
+
+print(len(Test().func(1,2,3)))
