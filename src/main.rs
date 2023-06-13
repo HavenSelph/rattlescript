@@ -56,8 +56,11 @@ fn main() {
             "-d" | "--disable-error-context" => disable_error_context = true,
             "-v" | "--verbose" => verbose = true,
             "-l" | "--license" => {
-                // Open the LICENSE file
+                // Open the LICENSE file for windows OR unix
+                #[cfg(target_os = "windows")]
                 let license = include_str!("..\\LICENSE.md");
+                #[cfg(target_os = "unix")]
+                let license = include_str!("../LICENSE.md");
 
                 // Trim the first two characters from each line
                 let license = license
