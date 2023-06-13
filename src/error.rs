@@ -72,7 +72,6 @@ macro_rules! runtime_error {
 }
 pub(crate) use runtime_error;
 
-
 impl Error {
     pub fn print_with_source(&self) {
         let msg = &self.message;
