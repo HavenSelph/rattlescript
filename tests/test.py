@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import os.path
+# NOT UNDER MY LICENSE
+# Original Author:
+# https://github.com/mustafaquraish/aecor/blob/master/meta/test.py
 from subprocess import run, PIPE
 import argparse
 from ast import literal_eval
