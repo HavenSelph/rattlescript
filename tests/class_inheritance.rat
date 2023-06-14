@@ -1,7 +1,10 @@
 /// out: "6"
 
 class Test {
-    def test_func(self, *a) => a
+    def new(self) => nothing
+    def test_func(self, *a) {
+        return a
+    }
 }
 
 
@@ -18,4 +21,4 @@ class Test2 {
 class InheritedTest(Test, Test2) {}
 
 let t = InheritedTest()
-print(t.test_func(1,2,3))
+print(t.test_func(1, 2, 3))

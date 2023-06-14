@@ -150,6 +150,7 @@ impl Interpreter {
                 name,
                 args,
                 required,
+                is_static: _,
                 in_class: _,
                 body,
             } => {
@@ -186,6 +187,7 @@ impl Interpreter {
                 fields,
                 parents,
             } => {
+                let mut field_vals: HashMap<String, (Value, bool)> = HashMap::new();
                 let parents: Option<Ref<Vec<Value>>> = match parents {
                     Some(parents) => {
                         let parent_vals: Ref<Vec<Value>> = make!(Vec::new());
@@ -202,15 +204,21 @@ impl Interpreter {
                                     error!(span, "Parent class `{}` not found", parent);
                                 }
                             }
+                            // Inject parent fields into class fields
+
+                            let parent_fields = match parent_val.clone() {
+                                Some(Value::Class(class)) => class.borrow().fields.clone(),
+                                _ => unreachable!(),
+                            };
+                            field_vals.extend(parent_fields);
                             parent_vals.borrow_mut().push(parent_val.unwrap());
                         }
                         Some(parent_vals)
                     }
                     None => None,
                 };
-                let mut field_vals: HashMap<String, Value> = HashMap::new();
-                for (name, definition) in fields {
-                    field_vals.insert(name.to_string(), self.run(definition, scope.clone())?);
+                for (name, (definition, visibility)) in fields {
+                    field_vals.insert(name.to_string(), (self.run(definition, scope.clone())?, *visibility));
                 }
 
                 let class = Value::Class(make!(Class {
@@ -531,7 +539,7 @@ impl Interpreter {
             }
             AST::FieldAccess(span, left, name) => {
                 let left = self.run(left, scope)?;
-                left.set_field(name.as_str(), &value, span)?;
+                left.set_field(span, name.as_str(), &value)?;
             }
             _ => error!(span, "Invalid assignment target"),
         }
@@ -722,49 +730,55 @@ impl Interpreter {
                 let class = _class.borrow();
                 let c_span = class.span;
                 let name = class.name.clone();
-                let parents = class.parents.clone();
+                // let parents = class.parents.clone();  // Removed, more info below
                 let fields = class.fields.clone();
 
                 let new_scope = Scope::new(Some(scope), false);
 
-                // Handle parent fields
-                if let Some(parents) = parents {
-                    for parent in parents.borrow().iter() {
-                        match parent {
-                            Value::Class(parent) => {
-                                let parent = parent.borrow();
-                                for (name, value) in parent.fields.iter() {
-                                    new_scope.borrow_mut().insert(
-                                        name,
-                                        value.clone(),
-                                        false,
-                                        span,
-                                    )?;
-                                }
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
-                }
+                // Removed for now, as it's not needed. Changed classes to eagerly evaluate their fields.
+                // This was done to allow for static fields and accessing them from non-instanced classes.
+                // // Handle parent fields
+                // if let Some(parents) = parents {
+                //     for parent in parents.borrow().iter() {
+                //         match parent {
+                //             Value::Class(parent) => {
+                //                 let parent = parent.borrow();
+                //                 for (name, value) in parent.fields.iter() {
+                //                     let value = Value::new_class_field(value.0.clone(), value.1);
+                //                     new_scope.borrow_mut().insert(
+                //                         name,
+                //                         value.clone(),
+                //                         false,
+                //                         span,
+                //                     )?;
+                //                 }
+                //             }
+                //             _ => unimplemented!(),
+                //         }
+                //     }
+                // }
 
                 // Handle class fields
                 for (name, value) in fields.iter() {
+                    let value = Value::new_class_field(value.0.clone(), value.1);
                     new_scope
                         .borrow_mut()
                         .insert(name, value.clone(), false, span)?;
                 }
 
-                let instance = Value::ClassInstance(make!(ClassInstance {
+                let mut instance = Value::ClassInstance(make!(ClassInstance {
                     span: c_span,
                     name: name.clone(),
                     parents: class.parents.clone(),
+                    in_initializer: true,
                     scope: new_scope.clone()
                 }));
 
                 // Call new if it exists
-                let Some(function) = new_scope.borrow().get("new") else {
+                let Some(mut function) = new_scope.borrow().get("new") else {
                     error!(span, "Class '{}' has no initializer.", name)
                 };
+                function = function.unpack_class_field().0;
                 match function {
                     Value::Function { .. } => {
                         self.do_call(span, new_scope, Some(instance.clone()), function, args)?;
@@ -775,6 +789,7 @@ impl Interpreter {
                         function.type_of()
                     ),
                 }
+                instance.class_instance_set_in_initializer(false);
                 instance
             }
             _ => error!(span, "Can't call object {:?}", callee),

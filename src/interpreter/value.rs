@@ -124,18 +124,30 @@ pub struct Function {
     pub scope: Ref<Scope>,
 }
 
+pub struct ClassField {
+    pub val: Value,
+    pub is_static: bool,
+}
+
 pub struct Class {
     pub span: Span,
     pub name: String,
     pub parents: Option<Ref<Vec<Value>>>,
-    pub fields: HashMap<String, Value>,
+    pub fields: HashMap<String, (Value, bool)>,
 }
 
 pub struct ClassInstance {
     pub span: Span,
     pub name: String,
     pub parents: Option<Ref<Vec<Value>>>,
+    pub in_initializer: bool,
     pub scope: Ref<Scope>,
+}
+
+impl ClassInstance {
+    pub fn set_in_initializer(&mut self, in_initializer: bool) {
+        self.in_initializer = in_initializer;
+    }
 }
 
 pub type CallArgValues = Vec<(Option<String>, Value)>;
@@ -159,6 +171,7 @@ pub struct BuiltInFunction(pub &'static str, pub Ref<BuiltInFunctionType>);
 
 #[derive(Clone)]
 pub enum Value {
+    ClassField(Ref<ClassField>),
     Array(Ref<Vec<Value>>),
     Tuple(Ref<Vec<Value>>),
     Boolean(bool),
@@ -174,6 +187,26 @@ pub enum Value {
     Range(i64, i64),
     Dict(Ref<HashMap<Value, Value>>),
     String(Rc<String>),
+}
+
+impl Value {
+    pub fn new_class_field(val: Value, is_static: bool) -> Value {
+        Value::ClassField(make!(ClassField { val, is_static }))
+    }
+
+    pub fn unpack_class_field(self) -> (Value, bool) {
+        match self {
+            Value::ClassField(field) => (field.borrow().val.clone(), field.borrow().is_static),
+            _ => unreachable!("{} is not a class field", self.type_of()),
+        }
+    }
+
+    pub fn class_instance_set_in_initializer(&mut self, in_initializer: bool) {
+        match self {
+            Value::ClassInstance(instance) => instance.borrow_mut().set_in_initializer(in_initializer),
+            _ => unreachable!("{} is not a class instance", self.type_of()),
+        }
+    }
 }
 
 impl Hash for Value {
@@ -201,6 +234,7 @@ impl Hash for Value {
             }
             Value::Tuple(tuple) => tuple.borrow().iter().for_each(|item| item.hash(state)),
             Value::Dict(items) => items.borrow().iter().for_each(|item| item.hash(state)),
+            Value::ClassField(_) => unreachable!("Class fields should never be hashed"),
         }
     }
 }
@@ -259,6 +293,7 @@ impl std::fmt::Debug for Value {
                 }
                 write!(f, "}}")
             }
+            Value::ClassField(_) => unreachable!("Class fields should never be debugged"),
         }
     }
 }
@@ -478,8 +513,30 @@ impl Value {
 
     pub fn get_field(&self, span: &Span, field: &String) -> Result<Value> {
         Ok(match self {
+            Value::Class(class) => match class.borrow().fields.get(field) {
+                Some(value) => {
+                    if !value.1 {
+                        error!(span, "Cannot access non-static field '{}' on class", field);
+                    }
+                    value.0.clone()
+                }
+                None => {
+                    error!(span, "Field '{}' not found on class", field);
+                }
+            }
             Value::ClassInstance(instance) => match instance.borrow().scope.borrow().get(field) {
-                Some(value) => value,
+                Some(value) => {
+                    // Fields will always be hidden in a ClassField value type, need to unpack them
+                    match value {
+                        Value::ClassField(class_field) => {
+                            if class_field.borrow().is_static {
+                                error!(span, "Cannot access static field '{}' on instance", field);
+                            }
+                            class_field.borrow().val.clone()
+                        },
+                        _ => unreachable!("Class fields should always be wrapped in a ClassField value type"),
+                    }
+                },
                 None => {
                     error!(span, "Field '{}' not found on class instance", field);
                 }
@@ -578,7 +635,7 @@ impl Value {
             _ => {
                 error!(
                     span,
-                    "Cannot access field '{}' on non-class instance", field
+                    "Cannot access field '{}' on type {}", field, self.type_of()
                 );
             }
         })
@@ -724,6 +781,9 @@ impl Value {
                 s.push('}');
                 s
             }
+            Value::ClassField(_) => {
+                unreachable!("Class fields should never be printed");
+            }
         }
     }
 
@@ -784,13 +844,47 @@ impl Value {
         Ok(())
     }
 
-    pub fn set_field(&self, field: &str, value: &Value, span: &Span) -> Result<()> {
+    pub fn set_field(&self,  span: &Span, field: &str, value: &Value) -> Result<()> {
         match self {
+            Value::Class(class) => {
+                let mut class = class.borrow_mut();
+                match class.fields.get(field) {
+                    Some(class_field) => {
+                        if !class_field.1 {
+                            error!(span, "Field {} is not static", field);
+                        }
+                    },
+                    None => error!(span, "Field {} not found", field),
+                }
+                class.fields.insert(field.to_string(), (value.clone(), true));
+            }
             Value::ClassInstance(inst) => {
+                // Find out if we are in new or not
+                let create_new = inst.borrow().in_initializer;
+
+                // Classes can now have static fields, so we need to check if the field is static
+                match inst.borrow().scope.borrow().get(field) {
+                    Some(value) => {
+                        match value {
+                            Value::ClassField { 0:class_field } => {
+                                if class_field.borrow().is_static {
+                                    error!(span, "Cannot set static field {} on instance", field);
+                                }
+                            },
+                            _ => {
+                                unreachable!("Class field should always be wrapped in ClassField")
+                            }
+                        }
+                    },
+                    None => if !create_new {
+                        error!(span, "Field {} not found", field)
+                    },
+                };
                 let inst = inst.borrow();
+                let value = Value::new_class_field(value.clone(), false);
                 inst.scope
                     .borrow_mut()
-                    .insert(field, value.clone(), false, span)?;
+                    .insert(field, value, false, span)?;
             }
             _ => error!(span, "Can't set field on {:?}", self),
         }
@@ -830,8 +924,38 @@ impl Value {
             Value::Tuple(..) => "Tuple",
             Value::Dict(..) => "Dict",
             Value::Iterator(..) => "Iterator",
+            Value::ClassField(..) => unreachable!("ClassField should never be printed"),
         }
     }
+
+    // pub fn get_class_field(&self, field: &str) -> Option<(Value, bool)> {
+    //     match self {
+    //         Value::Class(class) => {
+    //             let class = class.borrow();
+    //             match class.fields.get(field) {
+    //                 Some((value, is_static)) => Some((value.clone(), *is_static)),
+    //                 None => unreachable!("Class field should always be found"),
+    //             }
+    //         }
+    //         Value::ClassInstance(instance) => {
+    //             let instance = instance.borrow();
+    //             let temp = match instance.scope.borrow().get(field) {
+    //                 Some(value) => {
+    //                     match value {
+    //                         Value::ClassField { 0:class_field } => {
+    //                             Some((class_field.borrow().val.clone(), class_field.borrow().is_static))
+    //                         },
+    //                         _ => {
+    //                             unreachable!("Class field should always be wrapped in ClassField")
+    //                         }
+    //                     }
+    //                 },
+    //                 None => None,
+    //             }; temp
+    //         }
+    //         _ => unreachable!("Can't get class field on {:?}", self),
+    //     }
+    // }
 }
 
 fn escape_string(s: &str) -> String {

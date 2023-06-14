@@ -5,6 +5,7 @@ use crate::token::TokenKind::RightParen;
 use crate::token::{Token, TokenKind};
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::common::{Span};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -127,10 +128,16 @@ impl Parser {
         } else {
             None
         };
-        let mut fields: HashMap<String, Rc<AST>> = HashMap::new();
+        let mut fields: HashMap<String, (Rc<AST>, bool)> = HashMap::new();
 
         self.consume(TokenKind::LeftBrace)?;
         while self.cur().kind != TokenKind::RightBrace {
+            let is_static = if self.cur().kind == TokenKind::Static {
+                self.increment();
+                true
+            } else {
+                false
+            };
             match self.cur().kind {
                 TokenKind::Class => {
                     let class = self.parse_class()?;
@@ -139,19 +146,19 @@ impl Parser {
                             if fields.contains_key(name) {
                                 error!(span, "Duplicate field name");
                             }
-                            fields.insert(name.clone(), class.clone());
+                            fields.insert(name.clone(), (class.clone(), is_static));
                         }
                         _ => unreachable!(),
                     }
                 }
                 TokenKind::Def => {
-                    let func = self.parse_function(true)?;
+                    let func = self.parse_function(!is_static, is_static)?;
                     match func.as_ref() {
                         AST::Function { span, name, .. } => {
                             if fields.contains_key(name.clone().unwrap().as_str()) {
                                 error!(span, "Duplicate field name");
                             }
-                            fields.insert(name.clone().unwrap(), func.clone());
+                            fields.insert(name.clone().unwrap(), (func.clone(), is_static));
                         }
                         _ => unreachable!(),
                     }
@@ -168,7 +175,7 @@ impl Parser {
                                 if fields.contains_key(text.as_str()) {
                                     error!(span, "Duplicate field name");
                                 }
-                                fields.insert(text.clone(), val.clone());
+                                fields.insert(text.clone(), (val.clone(), is_static));
                             }
                             _ => error!(span, "Expected variable name not {:?}", name),
                         },
@@ -192,7 +199,7 @@ impl Parser {
 
     fn parse_lambda(&mut self) -> Result<Rc<AST>> {
         let start = self.consume(TokenKind::Pipe)?.span;
-        let (args, required) = self.parse_function_arguments(TokenKind::Pipe, false)?;
+        let (args, required) = self.parse_function_arguments(&start, TokenKind::Pipe, false)?;
         self.consume(TokenKind::Pipe)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
@@ -206,20 +213,31 @@ impl Parser {
             name: None,
             args,
             required,
+            is_static: false,
             in_class: false,
             body,
         }))
     }
 
-    fn parse_function(&mut self, in_class: bool) -> Result<Rc<AST>> {
+    fn parse_function(&mut self, in_class: bool, is_static: bool) -> Result<Rc<AST>> {
         let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
-        let (args, required) = self.parse_function_arguments(RightParen, in_class)?;
+        let (args, required) = self.parse_function_arguments(&start, RightParen, in_class)?;
         self.consume(RightParen)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
-            let expr = self.parse_expression()?;
+            let hint = self.cur().kind == TokenKind::LeftBrace;
+            let expr = match self.parse_expression() {
+                Ok(expr) => expr,
+                Err(err) => {
+                    if hint {
+                        error!(err.span, "Function expected expression, did you mean to use a block?");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            };
             self.consume_line_end()?;
             Rc::new(AST::Return(*expr.span(), expr))
         } else {
@@ -231,6 +249,7 @@ impl Parser {
             name: Some(name.text),
             args,
             required,
+            is_static,
             in_class,
             body,
         }))
@@ -238,6 +257,7 @@ impl Parser {
 
     fn parse_function_arguments(
         &mut self,
+        span: &Span,
         closer: TokenKind,
         in_class: bool,
     ) -> Result<(FunctionArgs, usize)> {
@@ -323,7 +343,11 @@ impl Parser {
             }
         }
         if in_class {
-            required -= 1;
+            if args.is_empty() && !found_self {
+                error!(span.extend(&self.cur().span), "Class method must include 'self' as first argument");
+            } else {
+                required -= 1;
+            }
         }
         Ok((args, required))
     }
@@ -384,9 +408,15 @@ impl Parser {
                 ..
             } => Ok(self.parse_class()?),
             Token {
+                kind: TokenKind::Static,
+                ..
+            } => {
+                error!(self.cur().span, "Static methods are not valid in this context.");
+            },
+            Token {
                 kind: TokenKind::Def,
                 ..
-            } => Ok(self.parse_function(false)?),
+            } => Ok(self.parse_function(false, false)?),
             Token {
                 kind: TokenKind::At,
                 span,
@@ -395,7 +425,7 @@ impl Parser {
                 self.increment();
                 let deco = self.parse_postfix()?;
                 self.consume_line_end()?;
-                let func = self.parse_function(false)?;
+                let func = self.parse_function(false, false)?;
                 let name = match func.as_ref() {
                     AST::Function { name, .. } => name.clone(),
                     _ => unreachable!(),
