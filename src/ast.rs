@@ -50,6 +50,11 @@ pub enum AST {
         in_class: bool,
         body: Rc<AST>,
     },
+    Namespace {
+        span: Span,
+        name: String,
+        body: Rc<AST>,
+    },
     If(Span, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
     Index(Span, Rc<AST>, Rc<AST>),
     IntegerLiteral(Span, i64),
@@ -151,6 +156,7 @@ impl AST {
             AST::ArrayLiteral(span, ..) => span,
             AST::TupleLiteral(span, ..) => span,
             AST::DictionaryLiteral(span, ..) => span,
+            AST::Namespace { span, .. } => span,
         }
     }
 }
@@ -299,6 +305,7 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, "}}")
             }
+            AST::Namespace{span:_, name, body} => write!(f, "namespace {} {{ {} }}", name, body)
         }
     }
 }

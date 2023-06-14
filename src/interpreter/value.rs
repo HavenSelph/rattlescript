@@ -187,6 +187,7 @@ pub enum Value {
     Range(i64, i64),
     Dict(Ref<HashMap<Value, Value>>),
     String(Rc<String>),
+    Namespace(Span, String, Ref<Scope>),
 }
 
 impl Value {
@@ -294,6 +295,7 @@ impl std::fmt::Debug for Value {
                 write!(f, "}}")
             }
             Value::ClassField(_) => unreachable!("Class fields should never be debugged"),
+            Value::Namespace(_, name, _) => write!(f, "<namespace {}>", name),
         }
     }
 }
@@ -513,6 +515,12 @@ impl Value {
 
     pub fn get_field(&self, span: &Span, field: &String) -> Result<Value> {
         Ok(match self {
+            Value::Namespace(span, _, scope) => match scope.borrow().get(field) {
+                Some(value) => value,
+                None => {
+                    error!(span, "Field '{}' not found on namespace", field);
+                }
+            }
             Value::Class(class) => match class.borrow().fields.get(field) {
                 Some(value) => {
                     if !value.1 {
@@ -781,6 +789,7 @@ impl Value {
                 s.push('}');
                 s
             }
+            Value::Namespace(..) => "<namespace>".to_string(),
             Value::ClassField(_) => {
                 unreachable!("Class fields should never be printed");
             }
@@ -894,21 +903,21 @@ impl Value {
     pub fn is_hashable(&self) -> bool {
         matches!(
             self,
-            Value::Integer(_)
-                | Value::Float(_)
-                | Value::String(_)
-                | Value::Boolean(_)
+            Value::Integer(..)
+                | Value::Float(..)
+                | Value::String(..)
+                | Value::Boolean(..)
                 | Value::Nothing
-                | Value::Iterator(_)
-                | Value::Range(_)
-                | Value::File(_)
-                | Value::BuiltInFunction(_)
-                | Value::Function(_)
-                | Value::Class(_)
-                | Value::ClassInstance(_)
-                | Value::Array(_)
-                | Value::Tuple(_)
-                | Value::Dict(_)
+                | Value::Iterator(..)
+                | Value::Range(..)
+                | Value::File(..)
+                | Value::BuiltInFunction(..)
+                | Value::Function(..)
+                | Value::Class(..)
+                | Value::ClassInstance(..)
+                | Value::Array(..)
+                | Value::Tuple(..)
+                | Value::Dict(..)
         )
     }
 
@@ -929,6 +938,7 @@ impl Value {
             Value::Tuple(..) => "Tuple",
             Value::Dict(..) => "Dict",
             Value::Iterator(..) => "Iterator",
+            Value::Namespace(..) => "Namespace",
             Value::ClassField(..) => unreachable!("ClassField should never be printed"),
         }
     }

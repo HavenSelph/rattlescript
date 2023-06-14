@@ -355,6 +355,21 @@ impl Parser {
     fn parse_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
         match self.cur() {
             Token {
+                kind: TokenKind::Namespace,
+                span,
+                ..
+            } => {
+                self.increment();
+                let ident = self.consume(TokenKind::Identifier)?;
+                let body = self.parse_block(/*global*/ false)?;
+                self.consume_line_end_until(until)?;
+                Ok(Rc::new(AST::Namespace {
+                    span: span.extend(body.span()),
+                    name: ident.text,
+                    body,
+                }))
+            },
+            Token {
                 kind: TokenKind::Let,
                 span,
                 ..

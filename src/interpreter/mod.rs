@@ -259,6 +259,24 @@ impl Interpreter {
                 let block_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
                 self.run_block_without_new_scope(ast, block_scope)?
             }
+            AST::Namespace { span, name, body } => {
+                // Create a new scope for the namespace
+                let namespace_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
+
+                // Run the namespace body
+                self.run_block_without_new_scope(body, namespace_scope.clone())?;
+
+                // Create the namespace value
+                let namespace = Value::Namespace(*span, name.clone(), namespace_scope);
+
+                // Insert the namespace into the parent scope
+                scope
+                    .borrow_mut()
+                    .insert(name, namespace, false, span)?;
+
+                // Return nothing, namespaces are not an expression
+                Value::Nothing
+            }
             AST::Variable(span, name) => match name.as_str() {
                 "len" => builtin!(len),
                 "print" => builtin!(print),

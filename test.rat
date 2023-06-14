@@ -1,16 +1,21 @@
+/*
+    todo: info on wip stuff:
+    - namespaces on current working tree
+    - imports are in stash
+*/
 
 
 namespace test {
     def test() {
-        println("test")
+        print("test")
     }
 
     def test2() {
-        println("test2")
+        print("test2")
     }
 
     def test3() {
-        println("test3")
+        print("test3")
     }
 }
 
