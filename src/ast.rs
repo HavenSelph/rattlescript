@@ -94,6 +94,16 @@ pub enum AST {
         step: Option<Rc<AST>>,
         body: Rc<AST>,
     },
+    Import {
+        span: Span,
+        path: String,
+        alias: Option<String>,
+    },
+    FromImport {
+        span: Span,
+        path: String,
+        names: Vec<(String, Option<String>)>,
+    },
     FieldAccess(Span, Rc<AST>, String),
     Comprehension(Span, String, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
     FormatStringLiteral(Span, Vec<String>, Vec<Rc<AST>>),
@@ -156,6 +166,8 @@ impl AST {
             AST::ArrayLiteral(span, ..) => span,
             AST::TupleLiteral(span, ..) => span,
             AST::DictionaryLiteral(span, ..) => span,
+            AST::Import { span, .. } => span,
+            AST::FromImport { span, .. } => span,
             AST::Namespace { span, .. } => span,
         }
     }
@@ -305,7 +317,33 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, "}}")
             }
-            AST::Namespace{span:_, name, body} => write!(f, "namespace {} {{ {} }}", name, body)
+            AST::Namespace{span:_, name, body} => write!(f, "namespace {} {{ {} }}", name, body),
+            AST::Import { span:_, path, alias } => {
+                write!(f, "import {}", path)?;
+                if let Some(alias) = alias {
+                    write!(f, " as {}", alias)?;
+                }
+                Ok(())
+            },
+            AST::FromImport { span:_, path, names } => {
+                write!(f, "from {} import ", path)?;
+                for (i, (name, alias)) in names.iter().enumerate() {
+                    if i == 0 {
+                        write!(f, "{{")?;
+                    }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", name)?;
+                    if let Some(alias) = alias {
+                        write!(f, " as {}", alias)?;
+                    }
+                }
+                if !names.is_empty() {
+                    write!(f, "}}")?;
+                }
+                Ok(())
+            },
         }
     }
 }

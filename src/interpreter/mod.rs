@@ -6,6 +6,7 @@ use crate::interpreter::value::{
     builtin, CallArgValues, Class, ClassInstance, Function, IteratorValue, Value,
 };
 use std::collections::HashMap;
+use std::io::Read;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -71,6 +72,12 @@ impl Interpreter {
         }
     }
 
+    pub fn run_and_return_scope(&mut self, ast: &Rc<AST>) -> Result<Ref<Scope>> {
+        let scope = Scope::new(None, false);
+        self.run(ast, scope.clone())?;
+        Ok(scope)
+    }
+
     pub fn execute(&mut self, ast: &Rc<AST>) -> Result<Value> {
         let scope = Scope::new(None, false);
         self.run(ast, scope)
@@ -95,6 +102,25 @@ impl Interpreter {
             }
             _ => unreachable!("run_block_without_scope called on non-block"),
         }
+    }
+
+    pub fn run_file(&mut self, span: &Span, path: &str) -> Result<Ref<Scope>> {
+        // Open file and read contents
+        let mut file = std::fs::File::open(path).expect("File not found");
+        let mut contents = String::new();
+        match file.read_to_string(&mut contents) {
+            Ok(_) => {}
+            Err(_) => error!(span, "Failed to read file"),
+        }
+
+        let mut lexer = crate::lexer::Lexer::new(contents, Box::leak(path.to_string().into_boxed_str()));
+        let tokens = lexer.lex()?;
+
+        let mut parser = crate::parser::Parser::new(tokens);
+        let ast = parser.parse()?;
+
+        let mut interpreter = Interpreter::new();
+        interpreter.run_and_return_scope(&ast)
     }
 
     fn run(&mut self, ast: &Rc<AST>, scope: Ref<Scope>) -> Result<Value> {
@@ -528,6 +554,25 @@ impl Interpreter {
                 }
                 Value::Dict(make!(map))
             }
+            AST::Import {
+                span,
+                path,
+                alias,
+            } => {
+                let program = self.run_file(span, path)?;
+                let name = match alias {
+                    Some(name) => name.clone(),
+                    None => {
+                        // Get last part of path
+                        let path = std::path::Path::new(path);
+                        path.file_name().unwrap().to_str().unwrap().to_string()
+                    }
+                };
+                Value::Namespace(*span, name, program)
+            },
+            AST::FromImport {..} => {
+                unimplemented!("Importing is not yet supported")
+            },
         })
     }
 

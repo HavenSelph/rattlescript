@@ -1,7 +1,6 @@
 use crate::ast::ArgumentType::{Keyword, Positional, VariadicKeyword};
 use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST};
 use crate::error::{eof_error, parser_error as error, Result};
-use crate::token::TokenKind::RightParen;
 use crate::token::{Token, TokenKind};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -115,7 +114,7 @@ impl Parser {
         let parents = if self.cur().kind == TokenKind::LeftParen {
             self.increment();
             let mut parents = vec![];
-            while self.cur().kind != RightParen {
+            while self.cur().kind != TokenKind::RightParen {
                 parents.push(self.consume(TokenKind::Identifier)?.text);
                 if self.cur().kind == TokenKind::Comma {
                     self.increment();
@@ -123,7 +122,7 @@ impl Parser {
                     break;
                 }
             }
-            self.consume(RightParen)?;
+            self.consume(TokenKind::RightParen)?;
             Some(parents)
         } else {
             None
@@ -223,8 +222,8 @@ impl Parser {
         let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
-        let (args, required) = self.parse_function_arguments(&start, RightParen, in_class)?;
-        self.consume(RightParen)?;
+        let (args, required) = self.parse_function_arguments(&start, TokenKind::RightParen, in_class)?;
+        self.consume(TokenKind::RightParen)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
             let hint = self.cur().kind == TokenKind::LeftBrace;
@@ -238,12 +237,10 @@ impl Parser {
                     }
                 }
             };
-            self.consume_line_end()?;
             Rc::new(AST::Return(*expr.span(), expr))
         } else {
             self.parse_block(/*global*/ false)?
         };
-        self.consume_line_end()?;
         Ok(Rc::new(AST::Function {
             span: start.extend(body.span()),
             name: Some(name.text),
@@ -352,6 +349,113 @@ impl Parser {
         Ok((args, required))
     }
 
+    fn parse_import_module(&mut self) -> Result<(String, Span)> {
+        let mut module: Vec<String> = Vec::new();
+        let mut span = self.cur().span;
+        loop {
+            let text = self.consume(TokenKind::Identifier)?;
+            span = span.extend(&text.span);
+            module.push(text.text);
+            if self.cur().kind == TokenKind::Dot {
+                self.increment();
+            } else {
+                break;
+            }
+        };
+        Ok((module.join(std::path::MAIN_SEPARATOR.to_string().as_str()), span))
+    }
+
+    fn parse_import_object(&mut self) -> Result<(Vec<(String, Option<String>)>, Span)> {
+        let mut objects: Vec<(String, Option<String>)> = Vec::new();
+        let mut span = self.cur().span;
+        match self.cur().kind {
+            TokenKind::LeftParen => {
+                self.increment();
+                loop {
+                    let object = self.consume(TokenKind::Identifier)?.text;
+                    let alias = if self.cur().kind == TokenKind::As {
+                        self.increment();
+                        Some(self.consume(TokenKind::Identifier)?.text)
+                    } else {
+                        None
+                    };
+                    objects.push((object, alias));
+                    if self.cur().kind == TokenKind::Comma {
+                        self.increment();
+                    } else {
+                        break;
+                    }
+                    span = span.extend(&self.cur().span);
+                }
+                self.consume(TokenKind::RightParen)?;
+            },
+            TokenKind::Identifier => {
+                let object = self.consume(TokenKind::Identifier)?;
+                span = span.extend(&object.span);
+                let object = object.text;
+                let alias = if self.cur().kind == TokenKind::As {
+                    self.increment();
+                    let name = self.consume(TokenKind::Identifier)?;
+                    span = span.extend(&name.span);
+                    Some(name.text)
+                } else {
+                    None
+                };
+                objects.push((object, alias));
+            },
+            _ => error!(self.cur().span, "Expected identifier or '('"),
+        };
+        Ok((objects, span))
+    }
+
+    fn parse_import(&mut self) -> Result<Rc<AST>> {
+        let start = self.cur();
+        self.increment();
+        Ok(match start.kind {
+            TokenKind::From => {
+                let (module, _) = self.parse_import_module()?;
+                self.consume(TokenKind::Import)?;
+                let (objects, span) = self.parse_import_object()?;
+                let span = start.span.extend(&span);
+                self.consume_line_end()?;
+
+                let path = std::path::Path::new(&module).with_extension("rat");
+                if !path.exists() {
+                    error!(span, "Module '{}' does not exist", module);
+                }
+
+                Rc::new(AST::FromImport {
+                    span,
+                    path: path.to_str().unwrap().to_string(),
+                    names: objects,
+                })
+            }
+            TokenKind::Import => {
+                let module = self.parse_import_module()?;
+                self.consume_line_end()?;
+                let alias = if self.cur().kind == TokenKind::As {
+                    self.increment();
+                    Some(self.consume(TokenKind::Identifier)?.text)
+                } else {
+                    None
+                };
+                self.consume_line_end()?;
+
+                let path = std::path::Path::new(&module.0);
+                if !path.exists() {
+                    error!(module.1, "Module '{}' does not exist", module.0);
+                }
+
+                Rc::new(AST::Import {
+                    span: start.span.extend(&module.1),
+                    path: path.to_str().unwrap().to_string(),
+                    alias,
+                })
+            }
+            _ => unreachable!("parse_import called without 'import' or 'from'"),
+        })
+    }
+
     fn parse_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
         match self.cur() {
             Token {
@@ -361,13 +465,49 @@ impl Parser {
             } => {
                 self.increment();
                 let ident = self.consume(TokenKind::Identifier)?;
-                let body = self.parse_block(/*global*/ false)?;
+
+                // Parse block of only functions, classes or variables
+                let start = self.consume(TokenKind::LeftBrace)?.span;
+                let mut body = Vec::new();
+                loop {
+                    match self.cur().kind {
+                        TokenKind::Def => {
+                            body.push(self.parse_function(false, false)?);
+                        },
+                        TokenKind::Class => {
+                            body.push(self.parse_class()?);
+                        },
+                        TokenKind::Let => {
+                            body.push(self.parse_statement(TokenKind::RightBrace)?);
+                        },
+                        TokenKind::RightBrace => {
+                            break;
+                        },
+                        _ => {
+                            error!(self.cur().span, "Expected function, class or variable");
+                        },
+                    }
+                    while self.cur().kind == TokenKind::SemiColon {
+                        self.increment();
+                    }
+                }
+                let end = self.consume(TokenKind::RightBrace)?.span;
+                let body = Rc::new(AST::Block(start.extend(&end), body));
                 self.consume_line_end_until(until)?;
                 Ok(Rc::new(AST::Namespace {
                     span: span.extend(body.span()),
                     name: ident.text,
                     body,
                 }))
+            },
+            Token {
+                kind: TokenKind::Import,
+                ..
+            } | Token {
+                kind: TokenKind::From,
+                ..
+            } => {
+                self.parse_import()
             },
             Token {
                 kind: TokenKind::Let,
@@ -511,12 +651,12 @@ impl Parser {
                         Some(self.parse_expression()?)
                     };
                     self.consume(TokenKind::SemiColon)?;
-                    let step = if self.cur().kind == RightParen {
+                    let step = if self.cur().kind == TokenKind::RightParen {
                         None
                     } else {
                         Some(self.parse_expression()?)
                     };
-                    self.consume(RightParen)?;
+                    self.consume(TokenKind::RightParen)?;
                     let body = self.parse_block(/*global*/ false)?;
                     Ok(Rc::new(AST::For {
                         span: span.extend(body.span()),
@@ -891,8 +1031,8 @@ impl Parser {
                     ..
                 } => {
                     self.increment();
-                    let args = self.parse_call_arguments(RightParen)?;
-                    let span = val.span().extend(&self.consume(RightParen)?.span);
+                    let args = self.parse_call_arguments(TokenKind::RightParen)?;
+                    let span = val.span().extend(&self.consume(TokenKind::RightParen)?.span);
                     val = Rc::new(AST::Call(span, val, args));
                 }
                 Token {
@@ -973,14 +1113,14 @@ impl Parser {
                 self.increment();
                 let mut exprs = vec![];
                 let mut tup = false;
-                while self.cur().kind != RightParen {
+                while self.cur().kind != TokenKind::RightParen {
                     exprs.push(self.parse_expression()?);
                     match self.cur().kind {
                         TokenKind::Comma => {
                             self.increment();
                             tup = true;
                         }
-                        RightParen => {}
+                        TokenKind::RightParen => {}
                         TokenKind::EOF => {
                             eof_error!(self.cur().span, "Expected `)` or ',' but got EOF")
                         }
@@ -992,7 +1132,7 @@ impl Parser {
                     }
                 }
                 let end = self.cur().span;
-                self.consume(RightParen)?;
+                self.consume(TokenKind::RightParen)?;
                 match exprs.len() {
                     1 if !tup => Ok(exprs.pop().unwrap()),
                     _ => Ok(Rc::new(AST::TupleLiteral(span.extend(&end), exprs))),
@@ -1210,7 +1350,7 @@ impl Parser {
         }
     }
 
-    fn parse_format_string(&mut self, span: crate::common::Span, text: String) -> Result<Rc<AST>> {
+    fn parse_format_string(&mut self, span: Span, text: String) -> Result<Rc<AST>> {
         let mut parts = vec![];
         let mut buf = String::new();
         let mut start_index = 1;
