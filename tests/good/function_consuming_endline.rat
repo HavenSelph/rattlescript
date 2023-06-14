@@ -1,0 +1,3 @@
+/// exit: 0
+
+class test { static def add(a,b) => a+b }
