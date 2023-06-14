@@ -2,6 +2,7 @@
 
 
 class Test {
+    def new(self) {}
     def func(self, *a) => a
 }
 

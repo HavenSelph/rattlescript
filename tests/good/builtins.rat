@@ -24,7 +24,7 @@ assert (1.2).int() == 1
 
 assert str(1) == "1"
 
-let file = open("./tests/builtins.rat")
+let file = open("./tests/good/builtins.rat")
 let lines = file.read().split("\n")
 print(lines)
 assert lines[0].strip() == "/// exit: 0"
