@@ -10,6 +10,8 @@ mod parser;
 mod repl;
 mod token;
 
+const LICENSE: &str = "MIT License\n\nCopyright (c) 2023 Haven Alexander Selph-Pfister\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n[Learn what this license permits you to do](https://choosealicense.com/licenses/mit/)\n";
+
 fn run_file(filename: &str, verbose: bool) -> Result<()> {
     let content = std::fs::read_to_string(filename).expect("Couldn't open input file");
 
@@ -56,22 +58,7 @@ fn main() {
             "-d" | "--disable-error-context" => disable_error_context = true,
             "-v" | "--verbose" => verbose = true,
             "-l" | "--license" => {
-                // Open the LICENSE file for windows OR unix
-                #[allow(clippy::if_same_then_else)]
-                let license = if cfg!(windows) {
-                    include_str!("..\\LICENSE.md")
-                } else {
-                    include_str!("../LICENSE.md")
-                };
-
-                // Trim the first two characters from each line
-                let license = license
-                    .lines()
-                    .map(|line| &line[2..])
-                    .collect::<Vec<&str>>()
-                    .join("\n");
-
-                println!("{}", license);
+                println!("{}", LICENSE);
                 std::process::exit(0);
             }
             "-i" | "--info" => {
