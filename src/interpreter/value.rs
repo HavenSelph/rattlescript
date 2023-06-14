@@ -234,7 +234,7 @@ impl Hash for Value {
             }
             Value::Tuple(tuple) => tuple.borrow().iter().for_each(|item| item.hash(state)),
             Value::Dict(items) => items.borrow().iter().for_each(|item| item.hash(state)),
-            Value::ClassField(_) => unreachable!("Class fields should never be hashed"),
+            _ => unreachable!("{} is not hashable", self.type_of()),
         }
     }
 }
@@ -898,12 +898,17 @@ impl Value {
                 | Value::Float(_)
                 | Value::String(_)
                 | Value::Boolean(_)
-                | Value::Tuple(_)
-                | Value::Function(_)
+                | Value::Nothing
+                | Value::Iterator(_)
+                | Value::Range(_)
+                | Value::File(_)
                 | Value::BuiltInFunction(_)
+                | Value::Function(_)
                 | Value::Class(_)
-                | Value::Range(..)
-                | Value::Nothing,
+                | Value::ClassInstance(_)
+                | Value::Array(_)
+                | Value::Tuple(_)
+                | Value::Dict(_)
         )
     }
 
