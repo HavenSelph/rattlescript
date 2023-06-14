@@ -756,14 +756,14 @@ impl Interpreter {
 
                 let instance = Value::ClassInstance(make!(ClassInstance {
                     span: c_span,
-                    name,
+                    name: name.clone(),
                     parents: class.parents.clone(),
                     scope: new_scope.clone()
                 }));
 
                 // Call new if it exists
                 let Some(function) = new_scope.borrow().get("new") else {
-                    return Ok(instance);
+                    error!(span, "Class '{}' has no initializer.", name)
                 };
                 match function {
                     Value::Function { .. } => {
