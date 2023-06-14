@@ -101,7 +101,9 @@ def handle_test(interpreter: str, path: Path, expected: Expected) -> Tuple[bool,
 
         expected_error = expected.value
 
-        if expected_error in error:
+        if expected_error == error:
+            return True, "(Success)", path
+        elif expected_error in error:
             return True, "(Success)", path
         else:
             try:
@@ -109,7 +111,7 @@ def handle_test(interpreter: str, path: Path, expected: Expected) -> Tuple[bool,
                 remaining = error_line.split("Error: ")[1]
             except IndexError:
                 remaining = error
-            return False, f"Did not find expected error message\nexpected: {expected_error}\ngot: '{remaining}'", path
+            return False, f"Did not find expected error message\nexpected: {repr(expected_error)}\ngot: '{repr(remaining)}'", path
 
     if process.returncode != 0 and expected.type != Result.EXIT_WITH_CODE:
         return False, f"Expected exit code 0, but got {process.returncode}\n{error}", path
@@ -122,9 +124,7 @@ def handle_test(interpreter: str, path: Path, expected: Expected) -> Tuple[bool,
         output = process.stdout.decode('utf-8').strip()
         try:
             expected_out = literal_eval(expected.value).strip()
-        except ValueError:
-            expected_out = expected.value.strip()
-        except SyntaxError:
+        except:  # noqa
             raise SyntaxError(f'Invalid options in file {path}')
         if output != expected_out:
             return False, f'Incorrect output produced\nexpected: {repr(expected_out)}\ngot: {repr(output)}', path

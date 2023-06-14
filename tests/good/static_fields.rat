@@ -1,0 +1,10 @@
+/// out: "Test"
+
+class Test {
+    static def print_name() {
+        print("Test")
+    }
+}
+
+Test.print_name()
+

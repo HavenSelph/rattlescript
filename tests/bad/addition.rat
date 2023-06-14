@@ -1,0 +1,3 @@
+/// fail: Invalid types for addition
+
+10 + "string"
