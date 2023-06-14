@@ -1,4 +1,4 @@
-/// fail: tests\bad\class_function_without_self.rat:4:5 Class method must include 'self' as first argument
+/// fail: Class method must include 'self' as first argument
 
 class Test {
     def new() {}
