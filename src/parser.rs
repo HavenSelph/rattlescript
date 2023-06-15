@@ -1,10 +1,10 @@
 use crate::ast::ArgumentType::{Keyword, Positional, VariadicKeyword};
 use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST};
+use crate::common::Span;
 use crate::error::{eof_error, parser_error as error, Result};
 use crate::token::{Token, TokenKind};
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::common::{Span};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -222,7 +222,8 @@ impl Parser {
         let start = self.consume(TokenKind::Def)?.span;
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
-        let (args, required) = self.parse_function_arguments(&start, TokenKind::RightParen, in_class)?;
+        let (args, required) =
+            self.parse_function_arguments(&start, TokenKind::RightParen, in_class)?;
         self.consume(TokenKind::RightParen)?;
         let body = if self.cur().kind == TokenKind::FatArrow {
             self.increment();
@@ -231,7 +232,10 @@ impl Parser {
                 Ok(expr) => expr,
                 Err(err) => {
                     if hint {
-                        error!(err.span, "Function expected expression, did you mean to use a block?");
+                        error!(
+                            err.span,
+                            "Function expected expression, did you mean to use a block?"
+                        );
                     } else {
                         return Err(err);
                     }
@@ -341,7 +345,10 @@ impl Parser {
         }
         if in_class {
             if args.is_empty() && !found_self {
-                error!(span.extend(&self.cur().span), "Class method must include 'self' as first argument");
+                error!(
+                    span.extend(&self.cur().span),
+                    "Class method must include 'self' as first argument"
+                );
             } else {
                 required -= 1;
             }
@@ -350,6 +357,7 @@ impl Parser {
     }
 
     fn parse_import_module(&mut self) -> Result<(String, Span)> {
+        // Fixme: Imports do not work properly when CWD is not at the same dir of the file being imported
         let mut module: Vec<String> = Vec::new();
         let mut span = self.cur().span;
         loop {
@@ -361,8 +369,14 @@ impl Parser {
             } else {
                 break;
             }
-        };
-        Ok((module.join(std::path::MAIN_SEPARATOR.to_string().as_str()), span))
+        }
+        let mut path = "./".to_string();
+        path.push_str(&module.join(std::path::MAIN_SEPARATOR.to_string().as_str()));
+        path.push_str(".rat");
+        Ok((
+            path,
+            span
+        ))
     }
 
     fn parse_import_object(&mut self) -> Result<(Vec<(String, Option<String>)>, Span)> {
@@ -388,7 +402,7 @@ impl Parser {
                     span = span.extend(&self.cur().span);
                 }
                 self.consume(TokenKind::RightParen)?;
-            },
+            }
             TokenKind::Identifier => {
                 let object = self.consume(TokenKind::Identifier)?;
                 span = span.extend(&object.span);
@@ -402,7 +416,7 @@ impl Parser {
                     None
                 };
                 objects.push((object, alias));
-            },
+            }
             _ => error!(self.cur().span, "Expected identifier or '('"),
         };
         Ok((objects, span))
@@ -441,7 +455,7 @@ impl Parser {
                 };
                 self.consume_line_end()?;
 
-                let path = std::path::Path::new(&module.0);
+                let path = dbg!(std::path::Path::new(&module.0));
                 if !path.exists() {
                     error!(module.1, "Module '{}' does not exist", module.0);
                 }
@@ -473,19 +487,19 @@ impl Parser {
                     match self.cur().kind {
                         TokenKind::Def => {
                             body.push(self.parse_function(false, false)?);
-                        },
+                        }
                         TokenKind::Class => {
                             body.push(self.parse_class()?);
-                        },
+                        }
                         TokenKind::Let => {
                             body.push(self.parse_statement(TokenKind::RightBrace)?);
-                        },
+                        }
                         TokenKind::RightBrace => {
                             break;
-                        },
+                        }
                         _ => {
                             error!(self.cur().span, "Expected function, class or variable");
-                        },
+                        }
                     }
                     while self.cur().kind == TokenKind::SemiColon {
                         self.increment();
@@ -499,16 +513,15 @@ impl Parser {
                     name: ident.text,
                     body,
                 }))
-            },
+            }
             Token {
                 kind: TokenKind::Import,
                 ..
-            } | Token {
+            }
+            | Token {
                 kind: TokenKind::From,
                 ..
-            } => {
-                self.parse_import()
-            },
+            } => self.parse_import(),
             Token {
                 kind: TokenKind::Let,
                 span,
@@ -566,8 +579,11 @@ impl Parser {
                 kind: TokenKind::Static,
                 ..
             } => {
-                error!(self.cur().span, "Static methods are not valid in this context.");
-            },
+                error!(
+                    self.cur().span,
+                    "Static methods are not valid in this context."
+                );
+            }
             Token {
                 kind: TokenKind::Def,
                 ..
@@ -1032,7 +1048,9 @@ impl Parser {
                 } => {
                     self.increment();
                     let args = self.parse_call_arguments(TokenKind::RightParen)?;
-                    let span = val.span().extend(&self.consume(TokenKind::RightParen)?.span);
+                    let span = val
+                        .span()
+                        .extend(&self.consume(TokenKind::RightParen)?.span);
                     val = Rc::new(AST::Call(span, val, args));
                 }
                 Token {

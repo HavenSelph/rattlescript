@@ -74,7 +74,7 @@ impl Interpreter {
 
     pub fn run_and_return_scope(&mut self, ast: &Rc<AST>) -> Result<Ref<Scope>> {
         let scope = Scope::new(None, false);
-        self.run(ast, scope.clone())?;
+        self.run_block_without_new_scope(ast, scope.clone())?;
         Ok(scope)
     }
 
@@ -113,7 +113,8 @@ impl Interpreter {
             Err(_) => error!(span, "Failed to read file"),
         }
 
-        let mut lexer = crate::lexer::Lexer::new(contents, Box::leak(path.to_string().into_boxed_str()));
+        let mut lexer =
+            crate::lexer::Lexer::new(contents, Box::leak(path.to_string().into_boxed_str()));
         let tokens = lexer.lex()?;
 
         let mut parser = crate::parser::Parser::new(tokens);
@@ -244,7 +245,10 @@ impl Interpreter {
                     None => None,
                 };
                 for (name, (definition, visibility)) in fields {
-                    field_vals.insert(name.to_string(), (self.run(definition, scope.clone())?, *visibility));
+                    field_vals.insert(
+                        name.to_string(),
+                        (self.run(definition, scope.clone())?, *visibility),
+                    );
                 }
 
                 let class = Value::Class(make!(Class {
@@ -296,9 +300,7 @@ impl Interpreter {
                 let namespace = Value::Namespace(*span, name.clone(), namespace_scope);
 
                 // Insert the namespace into the parent scope
-                scope
-                    .borrow_mut()
-                    .insert(name, namespace, false, span)?;
+                scope.borrow_mut().insert(name, namespace, false, span)?;
 
                 // Return nothing, namespaces are not an expression
                 Value::Nothing
@@ -554,25 +556,36 @@ impl Interpreter {
                 }
                 Value::Dict(make!(map))
             }
-            AST::Import {
-                span,
-                path,
-                alias,
-            } => {
+            AST::Import { span, path, alias } => {
                 let program = self.run_file(span, path)?;
                 let name = match alias {
                     Some(name) => name.clone(),
                     None => {
                         // Get last part of path
                         let path = std::path::Path::new(path);
-                        path.file_name().unwrap().to_str().unwrap().to_string()
+                        path.with_extension("").file_name().unwrap().to_str().unwrap().to_string()
                     }
                 };
-                Value::Namespace(*span, name, program)
-            },
-            AST::FromImport {..} => {
-                unimplemented!("Importing is not yet supported")
-            },
+                let program = Value::Namespace(*span, name.clone(), program);
+                scope.borrow_mut().insert(name.as_str(), program, false, span)?;
+                Value::Nothing
+            }
+            AST::FromImport { span, path, names } => {
+                let program = self.run_file(span, path)?;
+                // Insert all names into scope
+                for (name, alias) in names {
+                    let alias = match alias {
+                        Some(alias) => alias,
+                        None => name,
+                    };
+                    let value = match program.borrow().get(name.as_str()) {
+                        Some(value) => value.clone(),
+                        None => error!(span, "Variable `{}` doesn't exist", name),
+                    };
+                    scope.borrow_mut().insert(alias.as_str(), value, false, span)?;
+                }
+                Value::Nothing
+            }
         })
     }
 

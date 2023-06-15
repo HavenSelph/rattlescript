@@ -304,15 +304,27 @@ impl std::fmt::Display for AST {
                 }
                 write!(f, "}}")
             }
-            AST::Namespace{span:_, name, body} => write!(f, "namespace {} {{ {} }}", name, body),
-            AST::Import { span:_, path, alias } => {
+            AST::Namespace {
+                span: _,
+                name,
+                body,
+            } => write!(f, "namespace {} {{ {} }}", name, body),
+            AST::Import {
+                span: _,
+                path,
+                alias,
+            } => {
                 write!(f, "import {}", path)?;
                 if let Some(alias) = alias {
                     write!(f, " as {}", alias)?;
                 }
                 Ok(())
-            },
-            AST::FromImport { span:_, path, names } => {
+            }
+            AST::FromImport {
+                span: _,
+                path,
+                names,
+            } => {
                 write!(f, "from {} import ", path)?;
                 for (i, (name, alias)) in names.iter().enumerate() {
                     if i == 0 {
@@ -330,7 +342,7 @@ impl std::fmt::Display for AST {
                     write!(f, "}}")?;
                 }
                 Ok(())
-            },
+            }
         }
     }
 }
