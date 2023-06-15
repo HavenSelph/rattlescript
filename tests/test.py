@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOT UNDER MY LICENSE
 # Original Author:
 # https://github.com/mustafaquraish/aecor/blob/master/meta/test.py
 from subprocess import run, PIPE

@@ -6,6 +6,9 @@ use crate::interpreter::{Interpreter, Scope};
 use std::io::Write;
 use std::rc::Rc;
 
+
+pub const REPL_VERSION: &str = "1.0.0";
+
 pub struct Repl {
     interpreter: Interpreter,
     global_scope: Ref<Scope>,
@@ -79,6 +82,8 @@ impl Repl {
     }
 
     pub fn run(&mut self) {
+        println!("RattleScript REPL, press Ctrl-C to exit | REPL Version: {} | Language Version: {}", REPL_VERSION, env!("CARGO_PKG_VERSION"));
+        println!("MIT License: <https://choosealicense.com/licenses/mit/>");
         loop {
             match self.run_once() {
                 Ok(_) => {}

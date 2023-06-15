@@ -1,10 +1,8 @@
 #![allow(clippy::upper_case_acronyms)]
-
 use crate::error::Result;
 
 mod ast;
 mod common;
-mod compiler;
 mod error;
 mod interpreter;
 mod lexer;
@@ -36,35 +34,13 @@ fn run_file(filename: &str, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn compile_file(filename: &str, out_filename: &str) -> Result<()> {
-    use std::io::Write;
-
-    let content = std::fs::read_to_string(filename).expect("Couldn't open input file");
-
-    let mut lex = lexer::Lexer::new(content, Box::leak(filename.to_string().into_boxed_str()));
-    let tokens = lex.lex()?;
-
-    let mut parser = parser::Parser::new(tokens);
-    let ast = parser.parse()?;
-
-    let mut compiler = compiler::Compiler::new();
-    let code = compiler.compile(&ast)?;
-
-    // output code to out.c
-    let mut out_file = std::fs::File::create(out_filename).expect("Couldn't open output file");
-    out_file
-        .write_all(code.as_bytes())
-        .expect("Couldn't write to output file");
-    // println!("{}", code);
-    Ok(())
-}
-
 fn print_help(filename: &str) {
     println!("Usage: {} [options] [filename]", filename);
     println!("Options:");
-    println!("  -c, --compile                 Compile the input file (default: false)");
     println!("  -d, --disable-error-context   Disable error context (default: false)");
     println!("  -v, --verbose                 Enable verbose output (default: false)");
+    println!("  -i, --info                    Print info about the REPL");
+    println!("  -l, --license                 Print the license");
     println!("  -h, --help                    Print this help message");
 }
 
@@ -72,21 +48,45 @@ fn main() {
     let args = std::env::args().collect::<Vec<String>>();
 
     let mut filename = None;
-    let out_filename = "./local/compiled/out.c";
-    let mut compile = false;
     let mut disable_error_context = false;
     let mut verbose = false;
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
-            "-c" | "--compile" => compile = true,
             "-d" | "--disable-error-context" => disable_error_context = true,
             "-v" | "--verbose" => verbose = true,
+            "-l" | "--license" => {
+                // Open the LICENSE file
+                let license = include_str!("..\\LICENSE.md");
+
+                // Trim the first two characters from each line
+                let license = license
+                    .lines()
+                    .map(|line| &line[2..])
+                    .collect::<Vec<&str>>()
+                    .join("\n");
+
+                println!("{}", license);
+                std::process::exit(0);
+            },
+            "-i" | "--info" => {
+                println!("RattleScript REPL Version: {} | Language Version: {}", repl::REPL_VERSION, env!("CARGO_PKG_VERSION"));
+                println!("Author: Haven Selph <havenselph@gmail.com>");
+                println!("Repository: <https://github.com/HavenSelph/rattlescript>");
+                println!("MIT License: <https://choosealicense.com/licenses/mit/>");
+                std::process::exit(0);
+            }
             "-h" | "--help" => {
                 print_help(&args[0]);
                 std::process::exit(0);
             }
             arg => {
+                // Check if first character is a dash
+                if arg.starts_with('-') {
+                    eprintln!("Unknown option: {}", arg);
+                    print_help(&args[0]);
+                    std::process::exit(1);
+                }
                 if filename.is_some() {
                     print_help(&args[0]);
                     std::process::exit(1);
@@ -96,13 +96,10 @@ fn main() {
         }
     }
 
-    if filename.is_none() && !compile {
+    if filename.is_none() {
         let mut repl = repl::Repl::new(verbose);
         repl.run();
         std::process::exit(0);
-    } else if compile && filename.is_none() {
-        eprintln!("No filename provided");
-        std::process::exit(1);
     }
 
     let filename = match filename {
@@ -113,11 +110,7 @@ fn main() {
         }
     };
 
-    let result = if compile {
-        compile_file(filename, out_filename)
-    } else {
-        run_file(filename, verbose)
-    };
+    let result = run_file(filename, verbose);
 
     match result {
         Ok(_) => std::process::exit(0),

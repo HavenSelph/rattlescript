@@ -1,29 +1,24 @@
 # RattleScript is...
-An interpreted, dynamic, and expressive programming language written in Rust! It started as a small development
-project with a friend of mine, but has quickly turned into a passion! I hope to continue working on this project
-and one day host a whole standard library of functions and modules for people to use. Every week the feature list
-grows, and I'm excited to see where this project ends up!
+An interpreted, dynamic, and expressive programming language written in Rust! It started as a small development project with a friend of mine, but has quickly turned into a passion! I hope to continue working on this project and one day host a whole standard library of functions and modules for people to use. Every week the feature list grows, and I'm excited to see where this project ends up!
+
+RattleScript is licensed under the [MIT](https://github.com/HavenSelph/rattlescript/blob/main/LICENSE.md) license, learn more about what it permits [here](https://choosealicense.com/licenses/mit/).
 
 # Contributing
-Want to contribute? That's awesome! Go ahead and fork the repository and make a pull request! I'll be sure to
-review it as soon as I can. However, please make sure to make sure your contribution...
+Want to contribute? That's awesome! Go ahead and fork the repository and make a pull request! I'll be sure to review it as soon as I can. However, please make sure to make sure your contribution...
 - is NOT a formatting change. I will not accept changes that are unsubstantial.
 - either fixes, improves, or adds a feature to the language.
-- does not break any existing features. Github Actions will automatically run tests on your code, but please make sure to test your code yourself before submitting a pull request.
+- does not break any existing features. GitHub Actions will automatically run tests on your code, but please make sure to test your code yourself before submitting a pull request.
 - does not add any new dependencies. I understand that you may want to add a feature, but don't want to spend time reinventing the wheel. However, I want to keep this project independent of any external crates.
 - is not changing more than 1 feature at once. I want to keep pull requests on the small side and easy to review.
 
-If your change is large or requires a rewrite of many parts, please make sure to open an issue first so we can discuss it. I would hate to waste your time for me to not merge it in because of too many conflicts. Furthermore, please be sure to either document your code, or describe what it does in the pull request. If your change is large enough to permit it, please consider adding tests for common issues you had to prevent regression. I hate fixing things I've already fixed before, or that someone else has fixed before. The testing framework is very simple and you can find examples of it in the `./tests` directory. The script that handles testing is `./test.py`.
+If your change is large or requires a rewrite of many parts, please make sure to open an issue first, so we can discuss it. I would hate to waste your time for me to not merge it in because of too many conflicts. Furthermore, please be sure to either document your code, or describe what it does in the pull request. If your change is large enough to permit it, please consider adding tests for common issues you had to prevent regression. I hate fixing things I've already fixed before, or that someone else has fixed before. The testing framework is very simple, and you can find examples of it in the `./tests` directory. The script that handles testing is `./test.py`.
 
 # Building
 Since there are no dependencies, you need nothing more than the Rust compiler itself. Just run the following command:
 `cargo build --release`
 
 # Using
-RattleScript has two main ways of being ran. You can either open a REPL or run a single file. To open a REPL, simply
-pass no arguments to the executable. To run a file, pass the path to the file as an argument. For example, to run the
-file `./test.rat` you would pass the argument `./test.rat` to the interpreter. For more information, run the interpreter
-with the `--help` or `-h` flag.
+RattleScript has two main ways of being run. You can either open a REPL or run a single file. To open a REPL, simply pass no arguments to the executable. To run a file, pass the path to the file as an argument. For example, to run the file `./test.rat` you would pass the argument `./test.rat` to the interpreter. For more information, run the interpreter with the `--help` or `-h` flag.
 
 # Planned Language Features
 - Static fields on classes (methods and variables)
