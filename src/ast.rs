@@ -284,7 +284,7 @@ impl std::fmt::Display for AST {
             AST::PreIncrement(_, expr, offset) => {
                 write!(f, "{}{}", if *offset == 1 { "++" } else { "--" }, expr)
             }
-            AST::ArrayLiteral(_, exprs) => {
+            AST::ArrayLiteral(_, exprs) | AST::TupleLiteral(_, exprs) => {
                 write!(f, "[")?;
                 for (i, expr) in exprs.iter().enumerate() {
                     if i > 0 {
@@ -293,19 +293,6 @@ impl std::fmt::Display for AST {
                     write!(f, "{}", expr)?;
                 }
                 write!(f, "]")
-            }
-            AST::TupleLiteral(_, exprs) => {
-                write!(f, "(")?;
-                for (i, expr) in exprs.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", expr)?;
-                }
-                if exprs.len() == 1 {
-                    write!(f, ",")?;
-                }
-                write!(f, ")")
             }
             AST::DictionaryLiteral(_, items) => {
                 write!(f, "{{")?;
