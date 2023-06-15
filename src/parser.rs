@@ -162,21 +162,18 @@ impl Parser {
                         _ => unreachable!(),
                     }
                 }
-                TokenKind::Identifier => {
-                    let assignment = self.parse_assignment()?;
+                TokenKind::Let => {
+                    let assignment = self.parse_statement(TokenKind::RightBrace)?;
                     match assignment.as_ref() {
-                        AST::Assignment {
+                        AST::VarDeclaration {
                             0: span,
                             1: lhs,
                             2: val,
-                        } => match lhs.as_ref() {
-                            AST::Variable { 0: span, 1: text } => {
-                                if fields.contains_key(text.as_str()) {
-                                    error!(span, "Duplicate field name");
-                                }
-                                fields.insert(text.clone(), (val.clone(), is_static));
+                        } => {
+                            if fields.contains_key(lhs.as_str()) {
+                                error!(span, "Duplicate field name");
                             }
-                            _ => error!(span, "Expected variable name not {:?}", name),
+                            fields.insert(lhs.clone(), (val.clone(), is_static));
                         },
                         _ => unreachable!(),
                     }
