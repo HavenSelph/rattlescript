@@ -264,25 +264,15 @@ impl std::fmt::Debug for Value {
                 let instance = instance.borrow();
                 write!(f, "<class-instance {}>", instance.name)
             }
-            Value::Array(array) => {
+            Value::Array(thing) | Value::Tuple(thing) => {
                 write!(f, "[")?;
-                for (i, item) in array.borrow().iter().enumerate() {
+                for (i, item) in thing.borrow().iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
                     write!(f, "{}", item.repr())?;
                 }
                 write!(f, "]")
-            }
-            Value::Tuple(tuple) => {
-                write!(f, "(")?;
-                for (i, item) in tuple.borrow().iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", item.repr())?;
-                }
-                write!(f, ")")
             }
             Value::Dict(dict, ..) => {
                 write!(f, "{{")?;
@@ -748,31 +738,16 @@ impl Value {
             Value::Range(start, end) => format!("{}..{}", start, end),
             Value::BuiltInFunction(name) => format!("<built-in function {}>", name.0),
             Value::Nothing => "nothing".to_string(),
-            Value::Array(arr) => {
-                let arr = arr.borrow();
+            Value::Array(thing) | Value::Tuple(thing) => {
+                let thing = thing.borrow();
                 let mut s = "[".to_string();
-                for (i, v) in arr.iter().enumerate() {
+                for (i, v) in thing.iter().enumerate() {
                     if i > 0 {
                         s.push_str(", ");
                     }
                     s.push_str(&v.repr());
                 }
                 s.push(']');
-                s
-            }
-            Value::Tuple(tup) => {
-                let tup = tup.borrow();
-                let mut s = "(".to_string();
-                for (i, v) in tup.iter().enumerate() {
-                    if i > 0 {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&v.repr());
-                }
-                if tup.len() == 1 {
-                    s.push(',');
-                }
-                s.push(')');
                 s
             }
             Value::Dict(dict, ..) => {
