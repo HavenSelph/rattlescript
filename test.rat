@@ -1,28 +1,4 @@
-/*
-    todo: info on wip stuff:
-    - namespaces on current working tree
-    - imports are in stash
-*/
+import math
 
+math.add(1,2)
 
-namespace test {
-    def test() {
-        print("test")
-    }
-
-    def test2() {
-        print("test2")
-    }
-
-    def test3() {
-        print("test3")
-    }
-}
-
-test.test()
-test.test2()
-test.test3()
-
-let j = test
-
-j.test()
