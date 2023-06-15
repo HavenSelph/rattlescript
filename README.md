@@ -1,3 +1,5 @@
+![Tests](https://github.com/HavenSelph/rattlescript/actions/workflows/build.yml/badge.svg)
+
 # RattleScript is...
 An interpreted, dynamic, and expressive programming language written in Rust! It started as a small development project with a friend of mine, but has quickly turned into a passion! I hope to continue working on this project and one day host a whole standard library of functions and modules for people to use. Every week the feature list grows, and I'm excited to see where this project ends up!
 
