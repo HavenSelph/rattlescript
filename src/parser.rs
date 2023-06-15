@@ -452,7 +452,7 @@ impl Parser {
                 };
                 self.consume_line_end()?;
 
-                let path = dbg!(std::path::Path::new(&module.0));
+                let path = std::path::Path::new(&module.0);
                 if !path.exists() {
                     error!(module.1, "Module '{}' does not exist", module.0);
                 }
