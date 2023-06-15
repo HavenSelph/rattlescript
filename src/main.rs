@@ -57,10 +57,12 @@ fn main() {
             "-v" | "--verbose" => verbose = true,
             "-l" | "--license" => {
                 // Open the LICENSE file for windows OR unix
-                #[cfg(target_os = "windows")]
-                let license = include_str!("..\\LICENSE.md");
-                #[cfg(target_os = "unix")]
-                let license = include_str!("../LICENSE.md");
+                #[allow(clippy::if_same_then_else)]
+                let license = if cfg!(windows) {
+                    include_str!("..\\LICENSE.md")
+                } else {
+                    include_str!("../LICENSE.md")
+                };
 
                 // Trim the first two characters from each line
                 let license = license
@@ -71,9 +73,13 @@ fn main() {
 
                 println!("{}", license);
                 std::process::exit(0);
-            },
+            }
             "-i" | "--info" => {
-                println!("RattleScript REPL Version: {} | Language Version: {}", repl::REPL_VERSION, env!("CARGO_PKG_VERSION"));
+                println!(
+                    "RattleScript REPL Version: {} | Language Version: {}",
+                    repl::REPL_VERSION,
+                    env!("CARGO_PKG_VERSION")
+                );
                 println!("Author: Haven Selph <havenselph@gmail.com>");
                 println!("Repository: <https://github.com/HavenSelph/rattlescript>");
                 println!("MIT License: <https://choosealicense.com/licenses/mit/>");
