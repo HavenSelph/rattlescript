@@ -1,9 +1,10 @@
-use crate::ast::ArgumentType::{Keyword, Positional, VariadicKeyword};
+use crate::ast::ArgumentType::{Keyword, Positional, Variadic, VariadicKeyword};
 use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST, ImportObject};
 use crate::common::Span;
 use crate::error::{eof_error, parser_error as error, Result};
 use crate::token::{Token, TokenKind};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::rc::Rc;
 
 pub struct Parser {
@@ -255,100 +256,104 @@ impl Parser {
 
     fn parse_function_arguments(
         &mut self,
-        span: &Span,
+        _span: &Span,
         closer: TokenKind,
         in_class: bool,
     ) -> Result<(FunctionArgs, usize)> {
-        let mut accepting: Vec<ArgumentType> =
-            vec![Positional, ArgumentType::Variadic, Keyword, VariadicKeyword];
+        let mut accepting: Vec<ArgumentType> = vec![Positional, Variadic, Keyword, VariadicKeyword];
         let mut args: FunctionArgs = vec![]; // (name, default, type)
+        let mut seen: Vec<String> = vec![]; // names of arguments we've seen
         let mut required: usize = 0;
-        let mut found_self = !in_class;
 
-        while self.cur().kind != closer {
-            let mut span = self.cur().span;
-            // Todo: Change this to use StarExpression, StarStarExpression, AssignmentExpression, and Identifier AST nodes
-            match self.cur().kind {
-                TokenKind::Star => {
-                    if accepting.contains(&ArgumentType::Variadic) {
-                        self.increment();
-                        accepting = vec![Keyword, VariadicKeyword];
-
-                        let name = if self.cur().kind == TokenKind::Identifier {
-                            span = span.extend(&self.cur().span);
-                            let name = self.consume(TokenKind::Identifier)?.text;
-                            Some(name)
-                        } else {
-                            None
-                        };
-
-                        args.push((name.unwrap_or("".to_string()), None, ArgumentType::Variadic));
-                    } else {
-                        error!(
-                            self.cur().span,
-                            "Positional variadic argument is not valid here"
-                        );
-                    }
-                }
-                TokenKind::StarStar => {
-                    if accepting.contains(&VariadicKeyword) {
-                        self.increment();
-                        accepting = vec![];
-
-                        let name = if self.cur().kind == TokenKind::Identifier {
-                            span = span.extend(&self.cur().span);
-                            let name = self.consume(TokenKind::Identifier)?.text;
-                            Some(name)
-                        } else {
-                            None
-                        };
-
-                        args.push((name.unwrap_or("".to_string()), None, VariadicKeyword));
-                    } else {
-                        error!(
-                            self.cur().span,
-                            "Keyword variadic argument is not valid here"
-                        );
+        if in_class {
+            // the first argument should be self
+            match self.consume(TokenKind::Identifier) {
+                Ok(name) => {
+                    if name.text != "self" {
+                        error!(name.span, "First argument of class method must be self");
                     }
                 }
                 _ => {
-                    if accepting.contains(&Positional) || accepting.contains(&Keyword) {
-                        let name = self.consume(TokenKind::Identifier)?.text;
-                        if self.cur().kind == TokenKind::Equals {
-                            span = span.extend(&self.cur().span);
-                            self.increment();
-                            accepting = vec![Keyword, VariadicKeyword];
-                            args.push((name, Some(self.parse_expression()?), Keyword));
-                        } else {
-                            span = span.extend(&self.cur().span);
-                            args.push((name, None, Positional));
-                            required += 1;
-                        };
-                    } else {
-                        error!(self.cur().span, "Unexpected argument");
-                    }
+                    error!(self.cur().span, "First argument of class method must be self");
                 }
             }
-            if !found_self && in_class && args[0].0 != "self" {
-                error!(span, "First argument must be 'self'");
-            } else if !found_self && in_class {
-                found_self = true;
-                args.pop();
+            // skip comma if there is one
+            if self.cur().kind == TokenKind::Comma {
+                self.increment();
+            }
+        }
+
+        while self.cur().kind != closer {
+            let val = self.parse_expression()?;
+            let name = match val.deref() {
+                AST::Variable(span, name) => {
+                    // we've found a positional argument
+                    if !accepting.contains(&Positional) {
+                        error!(span, "Unexpected positional argument");
+                    }
+                    required += 1;
+                    args.push((name.clone(), None, Positional));
+                    name
+                }
+                AST::StarExpression(span, expr) => {
+                    // we've found a variadic argument
+                    if !accepting.contains(&Variadic) {
+                        error!(span, "Unexpected variadic argument");
+                    } else {
+                        accepting = vec![Keyword, VariadicKeyword]; // only accept keyword arguments
+                        // Check if expr is a variable
+                        if let AST::Variable(_, name) = expr.deref() {
+                            args.push((name.clone(), None, Variadic));
+                            name
+                        } else {
+                            error!(expr.span(), "Expected variable name, not {}", expr);
+                        }
+                    }
+                }
+                AST::Assignment(span, lhs, rhs) => {
+                    // we've found a keyword argument
+                    if !accepting.contains(&Keyword) {
+                        error!(span, "Unexpected keyword argument");
+                    } else {
+                        accepting = vec![Keyword, VariadicKeyword]; // only accept keyword arguments
+
+                        // check if lhs is a variable
+                        if let AST::Variable(_, name) = lhs.deref() {
+                            args.push((name.clone(), Some(rhs.clone()), Keyword));
+                            name
+                        } else {
+                            error!(lhs.span(), "Expected variable name, not {}", lhs);
+                        }
+                    }
+                }
+                AST::StarStarExpression(span, expr) => {
+                    // we've found a variadic keyword argument
+                    if !accepting.contains(&VariadicKeyword) {
+                        error!(span, "Unexpected variadic keyword argument");
+                    } else {
+                        accepting = vec![]; // don't accept any more arguments
+                        // Check if expr is a variable
+                        if let AST::Variable(_, name) = expr.deref() {
+                            args.push((name.clone(), None, VariadicKeyword));
+                            name
+                        } else {
+                            error!(expr.span(), "Expected variable name, not {}", expr);
+                        }
+                    }
+                }
+                _ => {
+                    error!(val.span(), "Unexpected expression");
+                }
+            };
+            if seen.contains(name) {
+                error!(val.span(), "Duplicate argument name '{}'", name);
+            } else {
+                seen.push(name.clone());
             }
             if self.cur().kind == TokenKind::Comma {
                 self.increment();
             } else {
                 break;
-            }
-        }
-        if in_class {
-            if args.is_empty() && !found_self {
-                error!(
-                    span.extend(&self.cur().span),
-                    "Class method must include 'self' as first argument"
-                );
-            } else {
-                required -= 1;
             }
         }
         Ok((args, required))
