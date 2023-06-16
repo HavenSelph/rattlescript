@@ -1,3 +1,5 @@
+![Tests](https://github.com/HavenSelph/rattlescript/actions/workflows/build.yml/badge.svg)
+
 # RattleScript is...
 An interpreted, dynamic, and expressive programming language written in Rust! It started as a small development project with a friend of mine, but has quickly turned into a passion! I hope to continue working on this project and one day host a whole standard library of functions and modules for people to use. Every week the feature list grows, and I'm excited to see where this project ends up!
 
@@ -28,7 +30,6 @@ RattleScript has two main ways of being run. You can either open a REPL or run a
 - Switch statements (like match, but don't stop on first match)
 - Loop returns
 - Enums
-- Namespaces
 - Structs (maybe)
 - Better error messages (hints, possible solutions, pointing to the exact location of the problem instead of the statement)
 
@@ -65,7 +66,7 @@ let a = [1, 2, 3, 4, 5]
 [print(x) for x in a if x % 2 == 0]  // Prints each even element in the list
 ```
 ### Closure Scoping and Decorators
-```javascript
+```python
 def deco(msg) {
     def inner(func) {
         def wrapper(a, b) {
@@ -109,6 +110,20 @@ class ClassB(ClassA) {}  // ClassB inherits from ClassA
 let a = ClassB
 class ClassC(a) // This is valid too!
 ```
+### Namespaces
+```javascript
+namespace Math {
+    def add(a, b) => a+b
+    
+    def sub(a, b) => a-b
+    
+    let pi = 3.141592653589793
+}
+
+Math.add(1, 2)
+Math.pi 
+```
+
 ### Datatypes
 ```javascript
 let a = 10  // Integers

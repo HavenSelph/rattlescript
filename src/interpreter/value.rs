@@ -204,7 +204,9 @@ impl Value {
 
     pub fn class_instance_set_in_initializer(&mut self, in_initializer: bool) {
         match self {
-            Value::ClassInstance(instance) => instance.borrow_mut().set_in_initializer(in_initializer),
+            Value::ClassInstance(instance) => {
+                instance.borrow_mut().set_in_initializer(in_initializer)
+            }
             _ => unreachable!("{} is not a class instance", self.type_of()),
         }
     }
@@ -510,7 +512,7 @@ impl Value {
                 None => {
                     error!(span, "Field '{}' not found on namespace", field);
                 }
-            }
+            },
             Value::Class(class) => match class.borrow().fields.get(field) {
                 Some(value) => {
                     if !value.1 {
@@ -521,7 +523,7 @@ impl Value {
                 None => {
                     error!(span, "Field '{}' not found on class", field);
                 }
-            }
+            },
             Value::ClassInstance(instance) => match instance.borrow().scope.borrow().get(field) {
                 Some(value) => {
                     // Fields will always be hidden in a ClassField value type, need to unpack them
@@ -531,10 +533,12 @@ impl Value {
                                 error!(span, "Cannot access static field '{}' on instance", field);
                             }
                             class_field.borrow().val.clone()
-                        },
-                        _ => unreachable!("Class fields should always be wrapped in a ClassField value type"),
+                        }
+                        _ => unreachable!(
+                            "Class fields should always be wrapped in a ClassField value type"
+                        ),
                     }
-                },
+                }
                 None => {
                     error!(span, "Field '{}' not found on class instance", field);
                 }
@@ -633,7 +637,9 @@ impl Value {
             _ => {
                 error!(
                     span,
-                    "Cannot access field '{}' on type {}", field, self.type_of()
+                    "Cannot access field '{}' on type {}",
+                    field,
+                    self.type_of()
                 );
             }
         })
@@ -828,7 +834,7 @@ impl Value {
         Ok(())
     }
 
-    pub fn set_field(&self,  span: &Span, field: &str, value: &Value) -> Result<()> {
+    pub fn set_field(&self, span: &Span, field: &str, value: &Value) -> Result<()> {
         match self {
             Value::Class(class) => {
                 let mut class = class.borrow_mut();
@@ -837,10 +843,12 @@ impl Value {
                         if !class_field.1 {
                             error!(span, "Field {} is not static", field);
                         }
-                    },
+                    }
                     None => error!(span, "Field {} not found", field),
                 }
-                class.fields.insert(field.to_string(), (value.clone(), true));
+                class
+                    .fields
+                    .insert(field.to_string(), (value.clone(), true));
             }
             Value::ClassInstance(inst) => {
                 // Find out if we are in new or not
@@ -848,27 +856,25 @@ impl Value {
 
                 // Classes can now have static fields, so we need to check if the field is static
                 match inst.borrow().scope.borrow().get(field) {
-                    Some(value) => {
-                        match value {
-                            Value::ClassField { 0:class_field } => {
-                                if class_field.borrow().is_static {
-                                    error!(span, "Cannot set static field {} on instance", field);
-                                }
-                            },
-                            _ => {
-                                unreachable!("Class field should always be wrapped in ClassField")
+                    Some(value) => match value {
+                        Value::ClassField { 0: class_field } => {
+                            if class_field.borrow().is_static {
+                                error!(span, "Cannot set static field {} on instance", field);
                             }
                         }
+                        _ => {
+                            unreachable!("Class field should always be wrapped in ClassField")
+                        }
                     },
-                    None => if !create_new {
-                        error!(span, "Field {} not found", field)
-                    },
+                    None => {
+                        if !create_new {
+                            error!(span, "Field {} not found", field)
+                        }
+                    }
                 };
                 let inst = inst.borrow();
                 let value = Value::new_class_field(value.clone(), false);
-                inst.scope
-                    .borrow_mut()
-                    .insert(field, value, false, span)?;
+                inst.scope.borrow_mut().insert(field, value, false, span)?;
             }
             _ => error!(span, "Can't set field on {:?}", self),
         }

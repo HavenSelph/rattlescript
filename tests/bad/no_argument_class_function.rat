@@ -1,4 +1,4 @@
-/// fail: Class method must include 'self' as first argument
+/// fail: First argument of class method must be self
 
 class Test {
     def new() {

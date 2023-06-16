@@ -1,0 +1,8 @@
+/// out: "3 3"
+
+let x = [1,2]
+let y = {"a":1,"b":2}
+
+def add(a,b) => a+b
+
+print(add(*x), add(**y))
