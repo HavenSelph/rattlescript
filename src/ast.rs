@@ -23,6 +23,7 @@ impl std::fmt::Display for ArgumentType {
 
 pub type FunctionArgs = Vec<(String, Option<Rc<AST>>, ArgumentType)>;
 pub type CallArgs = Vec<(Option<String>, Rc<AST>)>;
+pub type ImportObject = (Vec<(String, Option<String>)>, Span);
 
 #[derive(Debug)]
 pub enum AST {

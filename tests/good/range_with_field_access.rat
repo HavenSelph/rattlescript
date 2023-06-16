@@ -1,0 +1,8 @@
+/// exit: 0
+
+class Test {
+    def new(self) => self.x = 1
+}
+
+let t=Test()
+let r = 0..t.x

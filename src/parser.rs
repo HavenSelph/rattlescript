@@ -1,5 +1,5 @@
 use crate::ast::ArgumentType::{Keyword, Positional, VariadicKeyword};
-use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST};
+use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST, ImportObject};
 use crate::common::Span;
 use crate::error::{eof_error, parser_error as error, Result};
 use crate::token::{Token, TokenKind};
@@ -376,7 +376,7 @@ impl Parser {
         ))
     }
 
-    fn parse_import_object(&mut self) -> Result<(Vec<(String, Option<String>)>, Span)> {
+    fn parse_import_object(&mut self) -> Result<ImportObject> {
         let mut objects: Vec<(String, Option<String>)> = Vec::new();
         let mut span = self.cur().span;
         match self.cur().kind {
@@ -1073,7 +1073,7 @@ impl Parser {
                     ..
                 } => {
                     self.increment();
-                    let end = self.parse_atom()?;
+                    let end = self.parse_prefix()?;
                     val = Rc::new(AST::Range(val.span().extend(end.span()), val, end));
                 }
                 Token {
