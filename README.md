@@ -23,7 +23,6 @@ Since there are no dependencies, you need nothing more than the Rust compiler it
 RattleScript has two main ways of being run. You can either open a REPL or run a single file. To open a REPL, simply pass no arguments to the executable. To run a file, pass the path to the file as an argument. For example, to run the file `./test.rat` you would pass the argument `./test.rat` to the interpreter. For more information, run the interpreter with the `--help` or `-h` flag.
 
 # Planned Language Features
-- Static fields on classes (methods and variables)
 - Import system
 - Sets
 - Match statements
@@ -36,7 +35,6 @@ RattleScript has two main ways of being run. You can either open a REPL or run a
 # Planned Backend Features
 - More file related functions
 - Better system for builtins
-- MAYBE macros
 
 # Features
 ### Variables and expressions
@@ -69,9 +67,9 @@ let a = [1, 2, 3, 4, 5]
 ```python
 def deco(msg) {
     def inner(func) {
-        def wrapper(a, b) {
-            print(msg, "input", a, b)
-            let res = func(a, b)        
+        def wrapper(*args, **kwargs) {
+            print(msg, "input: ", args, kwargs)
+            return func(*args, **kwargs)        
         }
     }
 }
