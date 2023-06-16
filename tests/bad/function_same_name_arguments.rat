@@ -1,0 +1,3 @@
+/// fail: Duplicate argument name
+
+def func(args, *args, **args) {}
