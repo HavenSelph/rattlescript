@@ -655,10 +655,65 @@ impl Interpreter {
         self.do_call(span, scope, parent, callee, &args)
     }
 
+    pub fn handle_star_expression(&mut self, scope: Ref<Scope>, expr: Rc<AST>) -> Result<Vec<Value>> {
+        let mut values: Vec<Value> = Vec::new();
+        match self.run(&expr, scope)? {
+            Value::Array(arr) => {
+                for value in arr.borrow().iter() {
+                    values.push(value.clone());
+                }
+            }
+            Value::Tuple(arr) => {
+                for value in arr.borrow().iter() {
+                    values.push(value.clone());
+                }
+            }
+            _ => error!(expr.span(), "Star expression can only be used with arrays and tuples"),
+        };
+        Ok(values)
+    }
+
+    pub fn handle_star_star_expression(&mut self, scope: Ref<Scope>, expr: Rc<AST>) -> Result<CallArgValues> {
+        let mut values: CallArgValues = CallArgValues::new();
+        match self.run(&expr, scope)? {
+            Value::Dict(map) => {
+                for (key, value) in map.borrow().iter() {
+                    match key {
+                        Value::String(key) => values.push((Some(key.deref().to_string()), value.clone())),
+                        _ => error!(expr.span(), "Star star expression can only be used with dictionaries using string keys"),
+                    }
+                }
+            }
+            _ => error!(expr.span(), "Star star expression can only be used with dictionaries"),
+        };
+        Ok(values)
+    }
+
     pub fn run_call_args(&mut self, scope: Ref<Scope>, args: &CallArgs) -> Result<CallArgValues> {
         let mut values = CallArgValues::new();
         for (name, value) in args {
-            values.push((name.clone(), self.run(value, scope.clone())?));
+            // We must handle star expressions
+            match value.deref() {
+                AST::StarExpression(span, expr) => {
+                    if name.is_some() {
+                        error!(span, "Star expressions can't be passed as named arguments")
+                    }
+                    self.handle_star_expression(scope.clone(), expr.clone())?.into_iter().for_each(|value| {
+                        values.push((None, value));
+                    });
+                },
+                AST::StarStarExpression(span, expr) => {
+                    if name.is_some() {
+                        error!(span, "Star star expressions can't be passed as named arguments")
+                    }
+                    self.handle_star_star_expression(scope.clone(), expr.clone())?.into_iter().for_each(|(name, value)| {
+                        values.push((name, value));
+                    });
+                },
+                _ => {
+                    values.push((name.clone(), self.run(value, scope.clone())?));
+                }
+            }
         }
         Ok(values)
     }
