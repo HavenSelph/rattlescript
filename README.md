@@ -64,7 +64,7 @@ let a = [1, 2, 3, 4, 5]
 [print(x) for x in a if x % 2 == 0]  // Prints each even element in the list
 ```
 ### Closure Scoping and Decorators
-```python
+```js
 def deco(msg) {
     def inner(func) {
         def wrapper(*args, **kwargs) {
