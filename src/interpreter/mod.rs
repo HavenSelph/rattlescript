@@ -586,6 +586,8 @@ impl Interpreter {
                 }
                 Value::Nothing
             }
+            AST::StarExpression(span, _) => error!(span, "Star expressions cannot be used here."),
+            AST::StarStarExpression(span, _) => error!(span, "Star star expressions cannot be used here."),
         })
     }
 

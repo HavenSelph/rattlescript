@@ -109,6 +109,8 @@ pub enum AST {
     Comprehension(Span, String, Rc<AST>, Rc<AST>, Option<Rc<AST>>),
     FormatStringLiteral(Span, Vec<String>, Vec<Rc<AST>>),
     Range(Span, Rc<AST>, Rc<AST>),
+    StarExpression(Span, Rc<AST>),
+    StarStarExpression(Span, Rc<AST>),
 
     PostIncrement(Span, Rc<AST>, i64),
     PreIncrement(Span, Rc<AST>, i64),
@@ -170,6 +172,8 @@ impl AST {
             AST::Import { span, .. } => span,
             AST::FromImport { span, .. } => span,
             AST::Namespace { span, .. } => span,
+            AST::StarExpression(span, ..) => span,
+            AST::StarStarExpression(span, ..) => span,
         }
     }
 }
@@ -344,6 +348,8 @@ impl std::fmt::Display for AST {
                 }
                 Ok(())
             }
+            AST::StarExpression(_, expr) => write!(f, "*{}", expr),
+            AST::StarStarExpression(_, expr) => write!(f, "**{}", expr),
         }
     }
 }

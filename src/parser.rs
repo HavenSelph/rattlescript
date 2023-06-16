@@ -267,6 +267,7 @@ impl Parser {
 
         while self.cur().kind != closer {
             let mut span = self.cur().span;
+            // Todo: Change this to use StarExpression, StarStarExpression, AssignmentExpression, and Identifier AST nodes
             match self.cur().kind {
                 TokenKind::Star => {
                     if accepting.contains(&ArgumentType::Variadic) {
@@ -979,6 +980,30 @@ impl Parser {
                     start.extend(expr.span()),
                     expr,
                     offset,
+                )))
+            }
+            TokenKind::Star {
+                ..
+            } => {
+                let start = self.cur().span;
+                self.increment();
+                // Can't allow another prefix, so we parse a postfix
+                let expr = self.parse_postfix()?;
+                Ok(Rc::new(AST::StarExpression(
+                    start.extend(expr.span()),
+                    expr,
+                )))
+            }
+            TokenKind::StarStar {
+                ..
+            } => {
+                let start = self.cur().span;
+                self.increment();
+                // Can't allow another prefix, so we parse a postfix
+                let expr = self.parse_postfix()?;
+                Ok(Rc::new(AST::StarStarExpression(
+                    start.extend(expr.span()),
+                    expr,
                 )))
             }
             _ => self.parse_postfix(),
