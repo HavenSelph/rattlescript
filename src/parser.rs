@@ -1,5 +1,5 @@
 use crate::ast::ArgumentType::{Keyword, Positional, Variadic, VariadicKeyword};
-use crate::ast::{ArgumentType, CallArgs, FunctionArgs, AST, ImportObject};
+use crate::ast::{ArgumentType, CallArgs, FunctionArgs, ImportObject, AST};
 use crate::common::Span;
 use crate::error::{eof_error, parser_error as error, Result};
 use crate::token::{Token, TokenKind};
@@ -175,7 +175,7 @@ impl Parser {
                                 error!(span, "Duplicate field name");
                             }
                             fields.insert(lhs.clone(), (val.clone(), is_static));
-                        },
+                        }
                         _ => unreachable!(),
                     }
                 }
@@ -274,7 +274,10 @@ impl Parser {
                     }
                 }
                 _ => {
-                    error!(self.cur().span, "First argument of class method must be self");
+                    error!(
+                        self.cur().span,
+                        "First argument of class method must be self"
+                    );
                 }
             }
             // skip comma if there is one
@@ -301,7 +304,7 @@ impl Parser {
                         error!(span, "Unexpected variadic argument");
                     } else {
                         accepting = vec![Keyword, VariadicKeyword]; // only accept keyword arguments
-                        // Check if expr is a variable
+                                                                    // Check if expr is a variable
                         if let AST::Variable(_, name) = expr.deref() {
                             args.push((name.clone(), None, Variadic));
                             name
@@ -332,7 +335,7 @@ impl Parser {
                         error!(span, "Unexpected variadic keyword argument");
                     } else {
                         accepting = vec![]; // don't accept any more arguments
-                        // Check if expr is a variable
+                                            // Check if expr is a variable
                         if let AST::Variable(_, name) = expr.deref() {
                             args.push((name.clone(), None, VariadicKeyword));
                             name
@@ -376,10 +379,7 @@ impl Parser {
         let mut path = "./".to_string();
         path.push_str(&module.join(std::path::MAIN_SEPARATOR.to_string().as_str()));
         path.push_str(".rat");
-        Ok((
-            path,
-            span
-        ))
+        Ok((path, span))
     }
 
     fn parse_import_object(&mut self) -> Result<ImportObject> {
@@ -987,9 +987,7 @@ impl Parser {
                     offset,
                 )))
             }
-            TokenKind::Star {
-                ..
-            } => {
+            TokenKind::Star { .. } => {
                 let start = self.cur().span;
                 self.increment();
                 // Can't allow another prefix, so we parse a postfix
@@ -999,9 +997,7 @@ impl Parser {
                     expr,
                 )))
             }
-            TokenKind::StarStar {
-                ..
-            } => {
+            TokenKind::StarStar { .. } => {
                 let start = self.cur().span;
                 self.increment();
                 // Can't allow another prefix, so we parse a postfix
