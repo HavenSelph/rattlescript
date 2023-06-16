@@ -171,6 +171,7 @@ pub struct BuiltInFunction(pub &'static str, pub Ref<BuiltInFunctionType>);
 
 #[derive(Clone)]
 pub enum Value {
+    // todo: remove this in place of a better class system
     ClassField(Ref<ClassField>),
     Array(Ref<Vec<Value>>),
     Tuple(Ref<Vec<Value>>),
@@ -228,6 +229,10 @@ impl Hash for Value {
             Value::File(_) => 0.hash(state),
             Value::BuiltInFunction(name) => name.0.hash(state),
             Value::Function(func) => func.as_ptr().hash(state),
+            // todo: Classes should have a scope, and instances should have a reference to that scope
+            // static fields should be placed in this scope, and class instances can access them via
+            // self, but they should not be able to modify them
+            // static fields and regular fields should have unique names
             Value::Class(class) => class.as_ptr().hash(state),
             Value::ClassInstance(instance) => instance.as_ptr().hash(state),
             Value::Array(array) => {
