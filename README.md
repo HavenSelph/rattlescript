@@ -57,7 +57,7 @@ def add(a, *b, c: 10, **d) => (a, b, c, d)
 
 add(1,2,3,c:10,k:12) // Will evaluate to (1, [2,3], 10, {k:12})
 ```
-### Comprensions
+### Comprehensions
 ```javascript
 let a = [1, 2, 3, 4, 5]
 [print(x) for x in a]  // Prints each element in the list
