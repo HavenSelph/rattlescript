@@ -830,9 +830,7 @@ impl Value {
             Value::ClassInstance(inst) => {
                 let mut instance = inst.borrow_mut();
                 let ClassInstance {span:_, name, parents:_, in_initializer, static_fields, fields:_} = instance.deref();
-                if *in_initializer {
-                    instance.fields.insert(field.to_string(), value.clone());
-                } else if instance.fields.contains_key(field) {
+                if *in_initializer || instance.fields.contains_key(field) {
                     instance.fields.insert(field.to_string(), value.clone());
                 } else if static_fields.borrow().contains_key(field) {
                     error!(span, "Cannot mutate static field '{}' on class-instance {}", field, name)
