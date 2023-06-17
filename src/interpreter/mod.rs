@@ -318,6 +318,7 @@ impl Interpreter {
                 "repr" => builtin!(repr),
                 "open" => builtin!(file_open),
                 "exit" => builtin!(exit),
+                "dump" => builtin!(dump),
                 _ => match scope.borrow().get(name) {
                     Some(val) => val,
                     None => {

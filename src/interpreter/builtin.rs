@@ -52,6 +52,20 @@ pub fn len(
     })
 }
 
+pub fn dump(
+    _interpreter: &mut Interpreter,
+    scope: Ref<Scope>,
+    _span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    // Dump the scope
+    if !args.is_empty() {
+        error!(_span, "dump() takes no arguments");
+    }
+    println!("{:#?}", scope.borrow().parent);
+    Ok(Value::Nothing)
+}
+
 pub fn push(
     _interpreter: &mut Interpreter,
     _scope: Ref<Scope>,
