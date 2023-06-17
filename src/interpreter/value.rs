@@ -10,36 +10,42 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct IteratorValue(pub Ref<dyn Iterator<Item = Value>>);
 
-struct RcChars {
-    _rc: Rc<String>,
-    chars: Option<std::str::Chars<'static>>,
-}
 
-impl Iterator for RcChars {
-    type Item = String;
+mod rc_chars {
+    use super::*;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(ref mut chars) = self.chars {
-            Some(chars.next()?.to_string())
-        } else {
-            None
+    pub struct RcChars {
+        _rc: Rc<String>,
+        chars: Option<std::str::Chars<'static>>,
+    }
+
+    impl Iterator for RcChars {
+        type Item = String;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if let Some(ref mut chars) = self.chars {
+                Some(chars.next()?.to_string())
+            } else {
+                None
+            }
+        }
+    }
+
+    impl RcChars {
+        pub fn from_rc(rc: Rc<String>) -> RcChars {
+            let mut new = Self {
+                _rc: rc,
+                chars: None,
+            };
+            new.chars = Some(unsafe { &*Rc::as_ptr(&new._rc) }.chars());
+            new
         }
     }
 }
 
-impl RcChars {
-    pub fn from_rc(rc: Rc<String>) -> RcChars {
-        let mut new = Self {
-            _rc: rc,
-            chars: None,
-        };
-        new.chars = Some(unsafe { &*Rc::as_ptr(&new._rc) }.chars());
-        new
-    }
-}
 
 struct StringIterator {
-    data: RcChars,
+    data: rc_chars::RcChars,
 }
 
 impl Iterator for StringIterator {
@@ -93,7 +99,7 @@ impl Iterator for DictIterator {
 impl IteratorValue {
     pub fn for_string(data: Rc<String>) -> IteratorValue {
         IteratorValue(make!(StringIterator {
-            data: RcChars::from_rc(data)
+            data: rc_chars::RcChars::from_rc(data)
         }))
     }
 
