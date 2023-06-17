@@ -4,6 +4,7 @@ use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Interpreter, Scope};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::ops::{Deref};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -124,24 +125,21 @@ pub struct Function {
     pub scope: Ref<Scope>,
 }
 
-pub struct ClassField {
-    pub val: Value,
-    pub is_static: bool,
-}
-
 pub struct Class {
     pub span: Span,
     pub name: String,
-    pub parents: Option<Ref<Vec<Value>>>,
-    pub fields: HashMap<String, (Value, bool)>,
+    pub parents: Option<Vec<Value>>,
+    pub static_fields: Ref<HashMap<String, Value>>,
+    pub fields: HashMap<String, Value>,
 }
 
 pub struct ClassInstance {
     pub span: Span,
     pub name: String,
-    pub parents: Option<Ref<Vec<Value>>>,
+    pub parents: Option<Vec<Value>>,
     pub in_initializer: bool,
-    pub scope: Ref<Scope>,
+    pub static_fields: Ref<HashMap<String, Value>>,
+    pub fields: HashMap<String, Value>,
 }
 
 impl ClassInstance {
@@ -171,8 +169,6 @@ pub struct BuiltInFunction(pub &'static str, pub Ref<BuiltInFunctionType>);
 
 #[derive(Clone)]
 pub enum Value {
-    // todo: remove this in place of a better class system
-    ClassField(Ref<ClassField>),
     Array(Ref<Vec<Value>>),
     Tuple(Ref<Vec<Value>>),
     Boolean(bool),
@@ -192,17 +188,9 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn new_class_field(val: Value, is_static: bool) -> Value {
-        Value::ClassField(make!(ClassField { val, is_static }))
-    }
-
-    pub fn unpack_class_field(self) -> (Value, bool) {
-        match self {
-            Value::ClassField(field) => (field.borrow().val.clone(), field.borrow().is_static),
-            _ => unreachable!("{} is not a class field", self.type_of()),
-        }
-    }
-
+    // This function is used to set the in_initializer flag on class instances
+    // which is used to determine whether or not to allow creating new fields
+    // on the instance.
     pub fn class_instance_set_in_initializer(&mut self, in_initializer: bool) {
         match self {
             Value::ClassInstance(instance) => {
@@ -229,10 +217,6 @@ impl Hash for Value {
             Value::File(_) => 0.hash(state),
             Value::BuiltInFunction(name) => name.0.hash(state),
             Value::Function(func) => func.as_ptr().hash(state),
-            // todo: Classes should have a scope, and instances should have a reference to that scope
-            // static fields should be placed in this scope, and class instances can access them via
-            // self, but they should not be able to modify them
-            // static fields and regular fields should have unique names
             Value::Class(class) => class.as_ptr().hash(state),
             Value::ClassInstance(instance) => instance.as_ptr().hash(state),
             Value::Array(array) => {
@@ -291,7 +275,6 @@ impl std::fmt::Debug for Value {
                 }
                 write!(f, "}}")
             }
-            Value::ClassField(_) => unreachable!("Class fields should never be debugged"),
             Value::Namespace(_, name, _) => write!(f, "<namespace {}>", name),
         }
     }
@@ -518,36 +501,31 @@ impl Value {
                     error!(span, "Field '{}' not found on namespace", field);
                 }
             },
-            Value::Class(class) => match class.borrow().fields.get(field) {
-                Some(value) => {
-                    if !value.1 {
-                        error!(span, "Cannot access non-static field '{}' on class", field);
-                    }
-                    value.0.clone()
-                }
-                None => {
-                    error!(span, "Field '{}' not found on class", field);
-                }
+            Value::Class(class) => {
+                let class = class.borrow();
+                let Class {span:_, name, parents:_, static_fields, fields } = class.deref();
+
+                // Check if the field exists in the class
+                let val = if let Some(value) = static_fields.borrow().get(field) {
+                    value.clone()
+                } else if let Some(value) = fields.get(field) {
+                    value.clone()
+                } else {
+                    error!(span, "Field '{}' not found on class '{}'", field, name);
+                }; val
             },
-            Value::ClassInstance(instance) => match instance.borrow().scope.borrow().get(field) {
-                Some(value) => {
-                    // Fields will always be hidden in a ClassField value type, need to unpack them
-                    match value {
-                        Value::ClassField(class_field) => {
-                            if class_field.borrow().is_static {
-                                error!(span, "Cannot access static field '{}' on instance", field);
-                            }
-                            class_field.borrow().val.clone()
-                        }
-                        _ => unreachable!(
-                            "Class fields should always be wrapped in a ClassField value type"
-                        ),
-                    }
-                }
-                None => {
-                    error!(span, "Field '{}' not found on class instance", field);
-                }
-            },
+            Value::ClassInstance(instance) => {
+                let instance = instance.borrow();
+                let ClassInstance {span:_, name, parents:_, in_initializer:_, static_fields, fields } = instance.deref();
+                // Check if the field exists in the class instance
+                let val = if let Some(value) = static_fields.borrow().get(field) {
+                    value.clone()
+                } else if let Some(value) = fields.get(field) {
+                    value.clone()
+                } else {
+                    error!(span, "Field '{}' not found on class instance '{}'", field, name);
+                }; val
+            }
             Value::Array(_) => match field.as_str() {
                 "len" => builtin!(len),
                 "push" => builtin!(push),
@@ -776,9 +754,6 @@ impl Value {
                 s
             }
             Value::Namespace(..) => "<namespace>".to_string(),
-            Value::ClassField(_) => {
-                unreachable!("Class fields should never be printed");
-            }
         }
     }
 
@@ -842,44 +817,28 @@ impl Value {
     pub fn set_field(&self, span: &Span, field: &str, value: &Value) -> Result<()> {
         match self {
             Value::Class(class) => {
-                let mut class = class.borrow_mut();
-                match class.fields.get(field) {
-                    Some(class_field) => {
-                        if !class_field.1 {
-                            error!(span, "Field {} is not static", field);
-                        }
-                    }
-                    None => error!(span, "Field {} not found", field),
+                let class = class.borrow();
+                let Class {span:_, name, parents:_, static_fields, fields} = class.deref();
+                if static_fields.borrow().contains_key(field) {
+                    static_fields.borrow_mut().insert(field.to_string(), value.clone());
+                } else if fields.contains_key(field) {
+                    error!(span, "Cannot mutate non-static field '{}' on class {}", field, name)
+                } else {
+                    error!(span, "Field '{}' not found in class '{}'", field, name);
                 }
-                class
-                    .fields
-                    .insert(field.to_string(), (value.clone(), true));
             }
             Value::ClassInstance(inst) => {
-                // Find out if we are in new or not
-                let create_new = inst.borrow().in_initializer;
-
-                // Classes can now have static fields, so we need to check if the field is static
-                match inst.borrow().scope.borrow().get(field) {
-                    Some(value) => match value {
-                        Value::ClassField { 0: class_field } => {
-                            if class_field.borrow().is_static {
-                                error!(span, "Cannot set static field {} on instance", field);
-                            }
-                        }
-                        _ => {
-                            unreachable!("Class field should always be wrapped in ClassField")
-                        }
-                    },
-                    None => {
-                        if !create_new {
-                            error!(span, "Field {} not found", field)
-                        }
-                    }
-                };
-                let inst = inst.borrow();
-                let value = Value::new_class_field(value.clone(), false);
-                inst.scope.borrow_mut().insert(field, value, false, span)?;
+                let mut instance = inst.borrow_mut();
+                let ClassInstance {span:_, name, parents:_, in_initializer, static_fields, fields:_} = instance.deref();
+                if *in_initializer {
+                    instance.fields.insert(field.to_string(), value.clone());
+                } else if instance.fields.contains_key(field) {
+                    instance.fields.insert(field.to_string(), value.clone());
+                } else if static_fields.borrow().contains_key(field) {
+                    error!(span, "Cannot mutate static field '{}' on class-instance {}", field, name)
+                } else {
+                    error!(span, "Field '{}' not found in class-instance '{}'", field, name);
+                }
             }
             _ => error!(span, "Can't set field on {:?}", self),
         }
@@ -925,7 +884,6 @@ impl Value {
             Value::Dict(..) => "Dict",
             Value::Iterator(..) => "Iterator",
             Value::Namespace(..) => "Namespace",
-            Value::ClassField(..) => unreachable!("ClassField should never be printed"),
         }
     }
 

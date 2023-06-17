@@ -214,49 +214,53 @@ impl Interpreter {
                 fields,
                 parents,
             } => {
-                let mut field_vals: HashMap<String, (Value, bool)> = HashMap::new();
-                let parents: Option<Ref<Vec<Value>>> = match parents {
+                let mut static_fields: HashMap<String, Value> = HashMap::new();
+                let mut instance_fields: HashMap<String, Value> = HashMap::new();
+                let parents: Option<Vec<Value>> = match parents {
                     Some(parents) => {
-                        let parent_vals: Ref<Vec<Value>> = make!(Vec::new());
+                        let mut parent_vals: Vec<Value> = Vec::new();
                         for parent in parents {
                             let parent_val = scope.borrow().get(parent.as_str());
-                            match parent_val.clone() {
-                                Some(value) => match value {
-                                    Value::Class(_) => {}
-                                    _ => {
-                                        error!(span, "Classes may only inherit from other classes and not `{}`", value.type_of());
-                                    }
+                            let class = match parent_val.clone() {
+                                Some(Value::Class(class)) => {
+                                    class
                                 },
-                                _ => {
-                                    error!(span, "Parent class `{}` not found", parent);
-                                }
-                            }
-                            // Inject parent fields into class fields
-
-                            let parent_fields = match parent_val.clone() {
-                                Some(Value::Class(class)) => class.borrow().fields.clone(),
-                                _ => unreachable!(),
+                                Some(val) => {
+                                    error!(span, "Parent class `{}` is not a class", val.type_of());
+                                },
+                                None => {
+                                    error!(span, "Parent class `{}` does not exist", parent);
+                                },
                             };
-                            field_vals.extend(parent_fields);
-                            parent_vals.borrow_mut().push(parent_val.unwrap());
-                        }
+                            let class = class.borrow();
+                            let Class { span:_, name:_, parents:_, static_fields: parent_static_fields, fields: parent_fields } = class.deref();
+
+                            static_fields.extend(parent_static_fields.borrow().clone()); // Handle static fields
+                            instance_fields.extend(parent_fields.clone()); // Handle instance fields
+                            parent_vals.push(parent_val.unwrap());
+                            }
                         Some(parent_vals)
                     }
                     None => None,
                 };
-                for (name, (definition, visibility)) in fields {
-                    field_vals.insert(
-                        name.to_string(),
-                        (self.run(definition, scope.clone())?, *visibility),
-                    );
+
+                for (name, (val, is_static)) in fields.into_iter() {
+                    let val = self.run(&val, scope.clone())?;
+                    if *is_static {
+                        static_fields.insert(name.to_string(), val);
+                    } else {
+                        instance_fields.insert(name.to_string(), val);
+                    }
                 }
 
                 let class = Value::Class(make!(Class {
                     span: *span,
                     name: name.clone(),
                     parents,
-                    fields: field_vals,
+                    static_fields: make!(static_fields),
+                    fields: instance_fields,
                 }));
+
                 scope
                     .borrow_mut()
                     .insert(name, class.clone(), false, span)?;
@@ -893,60 +897,25 @@ impl Interpreter {
             }
             Value::Class(_class) => {
                 let class = _class.borrow();
-                let c_span = class.span;
                 let name = class.name.clone();
-                // let parents = class.parents.clone();  // Removed, more info below
-                let fields = class.fields.clone();
-
-                let new_scope = Scope::new(Some(scope), false);
-
-                // Removed for now, as it's not needed. Changed classes to eagerly evaluate their fields.
-                // This was done to allow for static fields and accessing them from non-instanced classes.
-                // // Handle parent fields
-                // if let Some(parents) = parents {
-                //     for parent in parents.borrow().iter() {
-                //         match parent {
-                //             Value::Class(parent) => {
-                //                 let parent = parent.borrow();
-                //                 for (name, value) in parent.fields.iter() {
-                //                     let value = Value::new_class_field(value.0.clone(), value.1);
-                //                     new_scope.borrow_mut().insert(
-                //                         name,
-                //                         value.clone(),
-                //                         false,
-                //                         span,
-                //                     )?;
-                //                 }
-                //             }
-                //             _ => unimplemented!(),
-                //         }
-                //     }
-                // }
-
-                // Handle class fields
-                for (name, value) in fields.iter() {
-                    let value = Value::new_class_field(value.0.clone(), value.1);
-                    new_scope
-                        .borrow_mut()
-                        .insert(name, value.clone(), false, span)?;
-                }
+                let fields = class.fields.to_owned();
 
                 let mut instance = Value::ClassInstance(make!(ClassInstance {
-                    span: c_span,
+                    span: *span,
                     name: name.clone(),
                     parents: class.parents.clone(),
                     in_initializer: true,
-                    scope: new_scope.clone()
+                    static_fields: class.static_fields.clone(),
+                    fields: fields.clone()
                 }));
 
                 // Call new if it exists
-                let Some(mut function) = new_scope.borrow().get("new") else {
+                let Some(function) = fields.get("new") else {
                     error!(span, "Class '{}' has no initializer.", name)
                 };
-                function = function.unpack_class_field().0;
                 match function {
                     Value::Function { .. } => {
-                        self.do_call(span, new_scope, Some(instance.clone()), function, args)?;
+                        self.do_call(span, scope, Some(instance.clone()), function.clone(), args)?;
                     }
                     _ => error!(
                         span,
