@@ -245,8 +245,8 @@ impl Interpreter {
                     None => None,
                 };
 
-                for (name, (val, is_static)) in fields.into_iter() {
-                    let val = self.run(&val, scope.clone())?;
+                for (name, (val, is_static)) in fields.iter() {
+                    let val = self.run(val, scope.clone())?;
                     if *is_static {
                         static_fields.insert(name.to_string(), val);
                     } else {
