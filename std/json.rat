@@ -66,6 +66,32 @@ class JsonLexer {
         let string = ""
         self.next()
         while self.cur() != nothing and self.cur() != "\"" {
+            if self.cur() == "\\" {
+                self.next()
+                if self.cur() == "\"" {
+                    string += "\""
+                } else if self.cur() == "/" {
+                    string += "/"
+                } else if self.cur() == "\\" {
+                    string += "\\"
+                } else if self.cur() == "b" {
+                    string += "\b"
+                } else if self.cur() == "f" {
+                    string += "\f"
+                } else if self.cur() == "n" {
+                    string += "\n"
+                } else if self.cur() == "r" {
+                    string += "\r"
+                } else if self.cur() == "t" {
+                    string += "\t"
+                } else if self.cur() == "u" {
+                    print("Error: unicode escape sequence not supported")
+                    exit(1)
+                } else {
+                    print("Error: invalid escape sequence")
+                    exit(1)
+                }
+            }
             string += self.cur()
             self.next()
         }
