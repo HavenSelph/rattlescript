@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteTargetsManager">
+    <targets>
+      <target name="WSL - Ubuntu" type="wsl" uuid="43540b82-de44-45cc-b1e5-1685c9078d88">
+        <config>
+          <option name="distributionMsId" value="Ubuntu" />
+          <option name="projectRootOnTarget" value="/mnt/c/Program Files/JetBrains/CLion 2022.3.3/jbr/bin&#10;/rattlescript" />
+        </config>
+        <ContributedStateBase type="RsLanguageRuntime">
+          <config>
+            <option name="cargoPath" value="/usr/bin/cargo" />
+            <option name="cargoVersion" value="1.65.0" />
+            <option name="rustcPath" value="/usr/bin/rustc" />
+            <option name="rustcVersion" value="1.65.0" />
+          </config>
+        </ContributedStateBase>
+      </target>
+    </targets>
+  </component>
+</project>
