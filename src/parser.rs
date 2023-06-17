@@ -363,7 +363,6 @@ impl Parser {
     }
 
     fn parse_import_module(&mut self) -> Result<(String, Span)> {
-        // Fixme: Imports do not work properly when CWD is not at the same dir of the file being imported
         let mut module: Vec<String> = Vec::new();
         let mut span = self.cur().span;
         loop {
@@ -376,9 +375,13 @@ impl Parser {
                 break;
             }
         }
-        let mut path = "./".to_string();
-        path.push_str(&module.join(std::path::MAIN_SEPARATOR.to_string().as_str()));
-        path.push_str(".rat");
+        let path: String = std::path::Path::new(span.0.filename)
+            .parent()
+            .unwrap_or(std::path::Path::new(format!(".{}", std::path::MAIN_SEPARATOR_STR).as_str()))
+            .join(module.join(std::path::MAIN_SEPARATOR_STR))
+            .with_extension("rat")
+            .to_string_lossy()
+            .to_string();
         Ok((path, span))
     }
 
