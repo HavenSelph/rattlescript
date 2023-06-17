@@ -838,15 +838,29 @@ impl Parser {
     }
 
     fn parse_logical_and(&mut self) -> Result<Rc<AST>> {
-        let mut left = self.parse_comparison()?;
+        let mut left = self.parse_in()?;
         while let Token {
             kind: TokenKind::And,
             ..
         } = self.cur()
         {
             self.increment();
-            let right = self.parse_comparison()?;
+            let right = self.parse_in()?;
             left = Rc::new(AST::And(left.span().extend(right.span()), left, right));
+        }
+        Ok(left)
+    }
+
+    fn parse_in(&mut self) -> Result<Rc<AST>> {
+        let mut left = self.parse_comparison()?;
+        if let Token {
+            kind: TokenKind::In,
+            ..
+        } = self.cur()
+        {
+            self.increment();
+            let right = self.parse_comparison()?;
+            left = Rc::new(AST::In(left.span().extend(right.span()), left, right));
         }
         Ok(left)
     }

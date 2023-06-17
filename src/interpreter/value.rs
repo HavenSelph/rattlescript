@@ -655,6 +655,15 @@ impl Value {
         })
     }
 
+    pub fn contains(&self, other: &Value, span: &Span) -> Result<Value> {
+        Ok(match (self, other) {
+            (Value::String(left), Value::String(right)) => Value::Boolean(left.contains(right.as_str())),
+            (Value::Array(left), right) => Value::Boolean(left.borrow().deref().contains(right)),
+            (Value::Dict(left), right) => Value::Boolean(left.borrow().deref().contains_key(right)),
+            _ => error!(span, "Invalid types for contains {} and {}", self.type_of(), other.type_of()),
+        })
+    }
+
     pub fn equals(&self, other: &Value, _: &Span) -> Result<Value> {
         Ok(Value::Boolean(self == other))
     }

@@ -155,6 +155,7 @@ impl Interpreter {
             AST::Not(loc, expr) => dispatch_op!(loc, Value::not, expr),
             AST::And(loc, left, right) => dispatch_op!(loc, Value::and, left, right),
             AST::Or(loc, left, right) => dispatch_op!(loc, Value::or, left, right),
+            AST::In(loc, left, right) => dispatch_op!(loc, Value::contains, right, left),
 
             AST::Equals(loc, left, right) => dispatch_op!(loc, Value::equals, left, right),
             AST::NotEquals(loc, left, right) => dispatch_op!(loc, Value::not_equals, left, right),
