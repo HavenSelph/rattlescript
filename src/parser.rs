@@ -418,6 +418,7 @@ impl Parser {
         let mut span = self.cur().span;
         match self.cur().kind {
             TokenKind::LeftParen => {
+                let mut seen = Vec::new();
                 self.increment();
                 loop {
                     let object = self.consume(TokenKind::Identifier)?.text;
@@ -427,6 +428,10 @@ impl Parser {
                     } else {
                         None
                     };
+                    if seen.contains(&object) {
+                        error!(self.cur().span, "Duplicate object name '{}'", object);
+                    }
+                    seen.push(object.clone());
                     objects.push((object, alias));
                     if self.cur().kind == TokenKind::Comma {
                         self.increment();
@@ -450,6 +455,10 @@ impl Parser {
                     None
                 };
                 objects.push((object, alias));
+            }
+            TokenKind::Star => {
+                self.increment();
+                objects.push((String::from("*"), None));
             }
             _ => error!(self.cur().span, "Expected identifier or '('"),
         };

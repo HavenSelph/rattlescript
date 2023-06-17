@@ -589,19 +589,22 @@ impl Interpreter {
             }
             AST::FromImport { span, path, names } => {
                 let program = self.run_file(span, path)?;
-                // Insert all names into scope
-                for (name, alias) in names {
-                    let alias = match alias {
-                        Some(alias) => alias,
-                        None => name,
-                    };
-                    let value = match program.borrow().get(name.as_str()) {
-                        Some(value) => value.clone(),
-                        None => error!(span, "Variable `{}` doesn't exist", name),
-                    };
-                    scope
-                        .borrow_mut()
-                        .insert(alias.as_str(), value, false, span)?;
+                if names.first().expect("Import object is empty").0 == "*" { // Merge scopes
+                    scope.borrow_mut().vars.extend(program.borrow().vars.clone());
+                } else { // Insert all names into scope
+                    for (name, alias) in names {
+                        let alias = match alias {
+                            Some(alias) => alias,
+                            None => name,
+                        };
+                        let value = match program.borrow().get(name.as_str()) {
+                            Some(value) => value.clone(),
+                            None => error!(span, "Variable `{}` doesn't exist", name),
+                        };
+                        scope
+                            .borrow_mut()
+                            .insert(alias.as_str(), value, false, span)?;
+                    }
                 }
                 Value::Nothing
             }
