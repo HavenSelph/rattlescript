@@ -12,8 +12,7 @@ pub struct IteratorValue(pub Ref<dyn Iterator<Item = Value>>);
 
 
 mod rc_chars {
-    use super::*;
-
+    use super::Rc;
     pub struct RcChars {
         _rc: Rc<String>,
         chars: Option<std::str::Chars<'static>>,
