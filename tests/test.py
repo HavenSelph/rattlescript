@@ -63,31 +63,6 @@ def get_expected(filename) -> Optional[Expected]:
 
 
 def handle_test(interpreter: str, path: Path, expected: Expected) -> Tuple[bool, str, Path]:
-    # if expected.type == Result.COMPILE_FAIL:
-    #     if process.returncode == 0:
-    #         return False, "Expected compilation failure, but succeeded", path
-    #
-    #     error = process.stdout.decode("utf-8").strip()
-    #     expected_error = expected.value
-    #
-    #     if expected_error in error:
-    #         return True, "(Success)", path
-    #     else:
-    #         try:
-    #             remaining = error.split("Error: ")[1]
-    #         except IndexError:
-    #             remaining = error
-    #         return False, f"Did not find expected error message\n  expected: {expected_error}\n  got: '{remaining}'", path
-    #
-    # elif process.returncode != 0:
-    #     stdout = textwrap.indent(process.stdout.decode("utf-8"), " "*10).strip()
-    #     stderr = textwrap.indent(process.stderr.decode("utf-8"), " "*10).strip()
-    #     return False, f"Compilation failed:\n  code: {process.returncode}\n  stdout: {stdout}\n  stderr: {stderr}", path
-    #
-    # elif expected.type == Result.COMPILE_SUCCESS:
-    #     return True, "(Success)", path
-    #
-    # process = run([], stdout=PIPE, stderr=PIPE)
     process = run(
         [interpreter, "--disable-error-context", str(path)],
         stdout=PIPE,
