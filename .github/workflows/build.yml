@@ -16,7 +16,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           python3 -m pip install colorama
-          python3 ./tests/test.py
+          python3 ./tests/test.py -i release
   test_windows:
     runs-on: windows-latest
     steps:
@@ -30,7 +30,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}
             python -m pip install colorama
-          python ./tests/test.py
+          python ./tests/test.py -i release
   test_macos:
     runs-on: macos-latest
     steps:
@@ -44,4 +44,4 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           python3 -m pip install colorama
-          python3 ./tests/test.py
+          python3 ./tests/test.py -i release
