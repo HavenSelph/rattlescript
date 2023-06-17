@@ -362,7 +362,7 @@ impl Parser {
         Ok((args, required))
     }
 
-    fn parse_import_module(&mut self) -> Result<(String, Span)> {
+    fn parse_import_module(&mut self) -> Result<(String, Option<String>, Span)> {
         let mut module: Vec<String> = Vec::new();
         let mut span = self.cur().span;
         loop {
@@ -375,14 +375,34 @@ impl Parser {
                 break;
             }
         }
-        let path: String = std::path::Path::new(span.0.filename)
-            .parent()
+        let alias = if self.cur().kind == TokenKind::As {
+            self.increment();
+            let alias = self.consume(TokenKind::Identifier)?;
+            span = span.extend(&alias.span);
+            Some(alias.text)
+        } else {
+            None
+        };
+        // If the first module is std, we need to look in the RATTLESCRIPT_PATH
+        let path = if module.first().expect("Import module is empty") == "std" {
+            module.remove(0);
+            if module.is_empty() {
+                error!(span, "'std' is not a module");
+            }
+            std::path::Path::new(std::env::var("RATTLESCRIPT_PATH").expect("RATTLESCRIPT_PATH not set").as_str())
+                .join(module.join(std::path::MAIN_SEPARATOR_STR))
+                .with_extension("rat")
+        } else {  // Otherwise, we look relative to the current running file
+            std::path::Path::new(span.0.filename).to_path_buf()
+        }.parent()
             .unwrap_or(std::path::Path::new(format!(".{}", std::path::MAIN_SEPARATOR_STR).as_str()))
             .join(module.join(std::path::MAIN_SEPARATOR_STR))
-            .with_extension("rat")
-            .to_string_lossy()
-            .to_string();
-        Ok((path, span))
+            .with_extension("rat");
+
+        if !path.exists() {
+            error!(span, "Module {} not found", path.display());
+        }
+        Ok((path.to_string_lossy().to_string(), alias, span))
     }
 
     fn parse_import_object(&mut self) -> Result<ImportObject> {
@@ -433,7 +453,10 @@ impl Parser {
         self.increment();
         Ok(match start.kind {
             TokenKind::From => {
-                let (module, _) = self.parse_import_module()?;
+                let (module, alias, module_span) = self.parse_import_module()?;
+                if alias.is_some() {
+                    error!(module_span, "Unexpected alias");
+                }
                 self.consume(TokenKind::Import)?;
                 let (objects, span) = self.parse_import_object()?;
                 let span = start.span.extend(&span);
@@ -451,23 +474,16 @@ impl Parser {
                 })
             }
             TokenKind::Import => {
-                let module = self.parse_import_module()?;
-                self.consume_line_end()?;
-                let alias = if self.cur().kind == TokenKind::As {
-                    self.increment();
-                    Some(self.consume(TokenKind::Identifier)?.text)
-                } else {
-                    None
-                };
+                let (module, alias, module_span) = self.parse_import_module()?;
                 self.consume_line_end()?;
 
-                let path = std::path::Path::new(&module.0);
+                let path = std::path::Path::new(module.as_str());
                 if !path.exists() {
-                    error!(module.1, "Module '{}' does not exist", module.0);
+                    error!(start.span.extend(&module_span), "Module '{}' does not exist", module);
                 }
 
                 Rc::new(AST::Import {
-                    span: start.span.extend(&module.1),
+                    span: start.span.extend(&module_span),
                     path: path.to_str().unwrap().to_string(),
                     alias,
                 })

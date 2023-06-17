@@ -92,6 +92,33 @@ fn main() {
         }
     }
 
+    let rattle_script_path = match std::env::var("RATTLESCRIPT_PATH") {
+        Ok(path) => {
+            // Check if path is a directory
+            if !std::path::Path::new(&path).is_dir() {
+                eprintln!("{} is not a directory, consider set RATTLESCRIPT_PATH environment variable to the path of the RattleScript repository.", path);
+                std::process::exit(1);
+            }
+            std::path::Path::new(&path).to_path_buf()
+        }
+        Err(_) => {
+            match std::env::current_dir() {
+                Ok(path) => path,
+                Err(_) => {
+                    eprintln!("Couldn't get current directory, set RATTLESCRIPT_PATH environment variable to the path of the RattleScript repository.");
+                    std::process::exit(1);
+                }
+            }
+        }
+    };
+
+    if rattle_script_path.join("std").exists() {
+        std::env::set_var("RATTLESCRIPT_PATH", rattle_script_path.join("std"));
+    } else {
+        eprintln!("Couldn't find std directory in RATTLESCRIPT_PATH, set RATTLESCRIPT_PATH environment variable to the path of the RattleScript repository.");
+        std::process::exit(1);
+    }
+
     if filename.is_none() {
         let mut repl = repl::Repl::new(verbose);
         repl.run();

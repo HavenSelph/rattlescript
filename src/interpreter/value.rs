@@ -495,7 +495,7 @@ impl Value {
 
     pub fn get_field(&self, span: &Span, field: &String) -> Result<Value> {
         Ok(match self {
-            Value::Namespace(span, _, scope) => match scope.borrow().get(field) {
+            Value::Namespace(_, _, scope) => match scope.borrow().get(field) {
                 Some(value) => value,
                 None => {
                     error!(span, "Field '{}' not found on namespace", field);
