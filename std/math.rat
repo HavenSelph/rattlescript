@@ -1,0 +1,98 @@
+// Constants
+let pi = 3.141592653589793
+let e = 2.718281828459045
+
+// Helper functions
+def factorial(n) {
+    if n == 0 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+def floor(x) => x - x % 1
+
+def ceil(x) => floor(x) + 1
+
+def round(x) => floor(x + 0.5)
+
+def abs(x) {
+    if x < 0 {
+        return -x
+    }
+    return x
+}
+
+def sqrt(x) => x ** 0.5
+
+def add(x, y) => x + y
+
+def sub(x, y) => x - y
+
+def mul(x, y) => x * y
+
+def div(x, y) => x / y
+
+def mod(x, y) => x % y
+
+def pow(x, y) => x ** y
+
+def sin(x) {
+    let sum = 0
+    for i in 0..10 {
+        sum += (-1) ** i * x ** (2 * i + 1) / factorial(2 * i + 1)
+    }
+    return sum
+}
+
+def cos(x) {
+    let sum = 0
+    for i in 0..10 {
+        sum += (-1) ** i * x ** (2 * i) / factorial(2 * i)
+    }
+    return sum
+}
+
+def tan(x) => sin(x) / cos(x)
+
+def asin(x) {
+    let sum = 0
+    for i in 0..10 {
+        sum += factorial(2 * i) * x ** (2 * i + 1) / (4 ** i * factorial(i) ** 2 * (2 * i + 1))
+    }
+    return sum
+}
+
+def acos(x) => pi / 2 - asin(x)
+
+def atan(x) {
+    let sum = 0
+    for i in 0..10 {
+        sum += (-1) ** i * x ** (2 * i + 1) / (2 * i + 1)
+    }
+    return sum
+}
+
+def sinh(x) => (e ** x - e ** (-x)) / 2
+
+def cosh(x) => (e ** x + e ** (-x)) / 2
+
+def tanh(x) => sinh(x) / cosh(x)
+
+def asinh(x) => log(x + sqrt(x ** 2 + 1))
+
+def acosh(x) => log(x + sqrt(x ** 2 - 1))
+
+def atanh(x) => log((1 + x) / (1 - x)) / 2
+
+def log(x) {
+    let sum = 0
+    for i in 1..10 {
+        sum += (-1) ** (i + 1) * (x - 1) ** i / i
+    }
+    return sum
+}
+
+def log(x, base) => log(x) / log(base)
+
+def lg(x) => log(x, 10)

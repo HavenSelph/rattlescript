@@ -1,0 +1,112 @@
+from std.string import (is_space, is_digit)
+
+
+class JsonToken {
+    def new(self, type, data, index) {
+        self.type = type
+        self.data = data
+        self.index = index
+    }
+
+    static def print(self) {
+        print(self.type, self.data, self.index)
+    }
+}
+
+
+class JsonLexer {
+    def new(self, string) {
+        self.string = string
+        self.index = 0
+    }
+
+    def next(self) {
+        self.index++
+    }
+
+    def cur(self) {
+        if self.index >= len(self.string) {
+            return nothing
+        } else {
+            return self.string[self.index]
+        }
+    }
+
+    def lex(self) {
+        let tokens = []
+        while self.cur() != nothing {
+            if is_space(self.cur()) {
+                self.next()
+            } else if is_digit(self.cur()) {
+                tokens.push(self.lex_number())
+            } else if self.cur() == "\"" {
+                tokens.push(self.lex_string())
+            } else if self.cur() == "[" or self.cur() == "]" {
+                tokens.push(JsonToken(self.cur(), nothing, self.index))
+                self.next()
+            } else if self.cur() == "{" or self.cur() == "}" {
+                tokens.push(JsonToken(self.cur(), nothing, self.index))
+                self.next()
+            } else if self.cur() == ":" {
+                tokens.push(JsonToken(self.cur(), nothing, self.index))
+                self.next()
+            } else if self.cur() == "," {
+                tokens.push(JsonToken(self.cur(), nothing, self.index))
+                self.next()
+            } else {
+                print("Error: unexpected character")
+                exit(1)
+            }
+        }
+        return tokens
+    }
+
+    def lex_string(self) {
+        let index = self.index
+        let string = ""
+        self.next()
+        while self.cur() != nothing and self.cur() != "\"" {
+            string += self.cur()
+            self.next()
+        }
+        if self.cur() == nothing {
+            print("Error: unterminated string")
+            exit(1)
+        }
+        self.next()
+        return JsonToken("string", string, index)
+    }
+
+    def lex_number(self) {
+        let index = self.index
+        let number = ""
+        number += self.lex_integer()
+        if self.cur() == "." {
+            number += self.cur()
+            self.next()
+            number += self.lex_integer()
+            return JsonToken("float", number.float(), index)
+        }
+        return JsonToken("number", number.int(), index)
+    }
+
+    def lex_integer(self) {
+        let number = ""
+        while self.cur() != nothing and is_digit(self.cur()) {
+            number += self.cur()
+            self.next()
+        }
+        return number
+    }
+}
+
+def load(path) {
+    let file = open(path)
+    let content = file.read()
+    return loads(content)
+}
+
+def loads(string) {
+    let lexer = JsonLexer(string)
+    return lexer.lex()
+}
