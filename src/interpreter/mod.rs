@@ -223,23 +223,27 @@ impl Interpreter {
                         for parent in parents {
                             let parent_val = scope.borrow().get(parent.as_str());
                             let class = match parent_val.clone() {
-                                Some(Value::Class(class)) => {
-                                    class
-                                },
+                                Some(Value::Class(class)) => class,
                                 Some(val) => {
                                     error!(span, "Parent class `{}` is not a class", val.type_of());
-                                },
+                                }
                                 None => {
                                     error!(span, "Parent class `{}` does not exist", parent);
-                                },
+                                }
                             };
                             let class = class.borrow();
-                            let Class { span:_, name:_, parents:_, static_fields: parent_static_fields, fields: parent_fields } = class.deref();
+                            let Class {
+                                span: _,
+                                name: _,
+                                parents: _,
+                                static_fields: parent_static_fields,
+                                fields: parent_fields,
+                            } = class.deref();
 
                             static_fields.extend(parent_static_fields.borrow().clone()); // Handle static fields
                             instance_fields.extend(parent_fields.clone()); // Handle instance fields
                             parent_vals.push(parent_val.unwrap());
-                            }
+                        }
                         Some(parent_vals)
                     }
                     None => None,

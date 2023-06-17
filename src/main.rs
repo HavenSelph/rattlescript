@@ -101,15 +101,13 @@ fn main() {
             }
             std::path::Path::new(&path).to_path_buf()
         }
-        Err(_) => {
-            match std::env::current_dir() {
-                Ok(path) => path,
-                Err(_) => {
-                    eprintln!("Couldn't get current directory, set RATTLESCRIPT_PATH environment variable to the path of the RattleScript repository.");
-                    std::process::exit(1);
-                }
+        Err(_) => match std::env::current_dir() {
+            Ok(path) => path,
+            Err(_) => {
+                eprintln!("Couldn't get current directory, set RATTLESCRIPT_PATH environment variable to the path of the RattleScript repository.");
+                std::process::exit(1);
             }
-        }
+        },
     };
 
     if rattle_script_path.join("std").exists() {

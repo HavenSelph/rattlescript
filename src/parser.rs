@@ -389,10 +389,23 @@ impl Parser {
             if module.is_empty() {
                 error!(span, "'std' is not a module");
             }
-            std::path::Path::new(std::env::var("RATTLESCRIPT_PATH").expect("RATTLESCRIPT_PATH not set").as_str()).to_path_buf()
-        } else {  // Otherwise, we look relative to the current running file
-            std::path::Path::new(span.0.filename).parent().unwrap_or(std::path::Path::new(format!(".{}", std::path::MAIN_SEPARATOR_STR).as_str())).to_path_buf()
-        }.join(module.join(std::path::MAIN_SEPARATOR_STR)).with_extension("rat");
+            std::path::Path::new(
+                std::env::var("RATTLESCRIPT_PATH")
+                    .expect("RATTLESCRIPT_PATH not set")
+                    .as_str(),
+            )
+            .to_path_buf()
+        } else {
+            // Otherwise, we look relative to the current running file
+            std::path::Path::new(span.0.filename)
+                .parent()
+                .unwrap_or(std::path::Path::new(
+                    format!(".{}", std::path::MAIN_SEPARATOR_STR).as_str(),
+                ))
+                .to_path_buf()
+        }
+        .join(module.join(std::path::MAIN_SEPARATOR_STR))
+        .with_extension("rat");
 
         if !path.exists() {
             error!(span, "Module {} not found", path.display());
@@ -474,7 +487,10 @@ impl Parser {
 
                 let path = std::path::Path::new(module.as_str());
                 if !path.exists() {
-                    error!(start.span.extend(&module_span), "Module '{}' does not exist", module);
+                    error!(
+                        start.span.extend(&module_span),
+                        "Module '{}' does not exist", module
+                    );
                 }
 
                 Rc::new(AST::Import {

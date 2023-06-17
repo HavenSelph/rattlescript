@@ -4,7 +4,7 @@ use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Interpreter, Scope};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::ops::{Deref};
+use std::ops::Deref;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -503,7 +503,13 @@ impl Value {
             },
             Value::Class(class) => {
                 let class = class.borrow();
-                let Class {span:_, name, parents:_, static_fields, fields } = class.deref();
+                let Class {
+                    span: _,
+                    name,
+                    parents: _,
+                    static_fields,
+                    fields,
+                } = class.deref();
 
                 // Check if the field exists in the class
                 let val = if let Some(value) = static_fields.borrow().get(field) {
@@ -512,19 +518,31 @@ impl Value {
                     value.clone()
                 } else {
                     error!(span, "Field '{}' not found on class '{}'", field, name);
-                }; val
-            },
+                };
+                val
+            }
             Value::ClassInstance(instance) => {
                 let instance = instance.borrow();
-                let ClassInstance {span:_, name, parents:_, in_initializer:_, static_fields, fields } = instance.deref();
+                let ClassInstance {
+                    span: _,
+                    name,
+                    parents: _,
+                    in_initializer: _,
+                    static_fields,
+                    fields,
+                } = instance.deref();
                 // Check if the field exists in the class instance
                 let val = if let Some(value) = static_fields.borrow().get(field) {
                     value.clone()
                 } else if let Some(value) = fields.get(field) {
                     value.clone()
                 } else {
-                    error!(span, "Field '{}' not found on class instance '{}'", field, name);
-                }; val
+                    error!(
+                        span,
+                        "Field '{}' not found on class instance '{}'", field, name
+                    );
+                };
+                val
             }
             Value::Array(_) => match field.as_str() {
                 "len" => builtin!(len),
@@ -657,10 +675,17 @@ impl Value {
 
     pub fn contains(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
-            (Value::String(left), Value::String(right)) => Value::Boolean(left.contains(right.as_str())),
+            (Value::String(left), Value::String(right)) => {
+                Value::Boolean(left.contains(right.as_str()))
+            }
             (Value::Array(left), right) => Value::Boolean(left.borrow().deref().contains(right)),
             (Value::Dict(left), right) => Value::Boolean(left.borrow().deref().contains_key(right)),
-            _ => error!(span, "Invalid types for contains {} and {}", self.type_of(), other.type_of()),
+            _ => error!(
+                span,
+                "Invalid types for contains {} and {}",
+                self.type_of(),
+                other.type_of()
+            ),
         })
     }
 
@@ -827,24 +852,48 @@ impl Value {
         match self {
             Value::Class(class) => {
                 let class = class.borrow();
-                let Class {span:_, name, parents:_, static_fields, fields} = class.deref();
+                let Class {
+                    span: _,
+                    name,
+                    parents: _,
+                    static_fields,
+                    fields,
+                } = class.deref();
                 if static_fields.borrow().contains_key(field) {
-                    static_fields.borrow_mut().insert(field.to_string(), value.clone());
+                    static_fields
+                        .borrow_mut()
+                        .insert(field.to_string(), value.clone());
                 } else if fields.contains_key(field) {
-                    error!(span, "Cannot mutate non-static field '{}' on class {}", field, name)
+                    error!(
+                        span,
+                        "Cannot mutate non-static field '{}' on class {}", field, name
+                    )
                 } else {
                     error!(span, "Field '{}' not found in class '{}'", field, name);
                 }
             }
             Value::ClassInstance(inst) => {
                 let mut instance = inst.borrow_mut();
-                let ClassInstance {span:_, name, parents:_, in_initializer, static_fields, fields:_} = instance.deref();
+                let ClassInstance {
+                    span: _,
+                    name,
+                    parents: _,
+                    in_initializer,
+                    static_fields,
+                    fields: _,
+                } = instance.deref();
                 if *in_initializer || instance.fields.contains_key(field) {
                     instance.fields.insert(field.to_string(), value.clone());
                 } else if static_fields.borrow().contains_key(field) {
-                    error!(span, "Cannot mutate static field '{}' on class-instance {}", field, name)
+                    error!(
+                        span,
+                        "Cannot mutate static field '{}' on class-instance {}", field, name
+                    )
                 } else {
-                    error!(span, "Field '{}' not found in class-instance '{}'", field, name);
+                    error!(
+                        span,
+                        "Field '{}' not found in class-instance '{}'", field, name
+                    );
                 }
             }
             _ => error!(span, "Can't set field on {:?}", self),
