@@ -74,10 +74,6 @@ class JsonLexer {
                     string += "/"
                 } else if self.cur() == "\\" {
                     string += "\\"
-                } else if self.cur() == "b" {
-                    string += "\b"
-                } else if self.cur() == "f" {
-                    string += "\f"
                 } else if self.cur() == "n" {
                     string += "\n"
                 } else if self.cur() == "r" {
