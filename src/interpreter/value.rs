@@ -127,6 +127,7 @@ pub struct Function {
     pub body: Rc<AST>,
     pub args: Vec<(String, Option<Value>, ArgumentType)>,
     pub required: usize,
+    pub class_method: bool,
     pub scope: Ref<Scope>,
 }
 

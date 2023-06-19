@@ -178,8 +178,8 @@ impl Interpreter {
                 name,
                 args,
                 required,
-                is_static: _,
-                in_class: _,
+                is_static,
+                in_class,
                 body,
             } => {
                 let func = Value::Function(make!(Function {
@@ -196,6 +196,7 @@ impl Interpreter {
                         ))
                         .collect(),
                     required: *required,
+                    class_method: (*in_class && !*is_static),
                     body: body.clone(),
                     scope: scope.clone()
                 }));
@@ -728,6 +729,9 @@ impl Interpreter {
     }
 
     pub fn run_call_args(&mut self, scope: Ref<Scope>, args: &CallArgs) -> Result<CallArgValues> {
+        /*
+            Takes CallArgs and runs each argument, returning CallArgValues
+         */
         let mut values = CallArgValues::new();
         for (name, value) in args {
             // We must handle star expressions
@@ -777,12 +781,20 @@ impl Interpreter {
                 // Setup scope
 
                 let run_scope = Scope::new(Some(func.borrow().scope.clone()), true);
-                if let Some(parent) = parent {
-                    run_scope.borrow_mut().insert("self", parent, false, span)?;
-                }
+
+                // This will always inject parent if it exists, meaning even if function is not a class method.
+                // if let Some(parent) = parent {
+                //     run_scope.borrow_mut().insert("self", parent, false, span)?;
+                // }
 
                 // Let's handle the function arguments
                 let func = func.borrow();
+
+                // Let's check if self should be injected
+                if func.class_method && parent.is_some() {
+                    run_scope.borrow_mut().insert("self", parent.unwrap(), false, span)?;
+                }
+
                 let mut variadic_name = None;
                 let mut variadic_keyword_name = None;
 
