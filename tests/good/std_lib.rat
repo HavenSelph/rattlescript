@@ -1,0 +1,5 @@
+/// out: "true\ntrue\ntrue\n"
+from std.string import *
+print(is_space(" "))
+print(is_alpha("a"))
+print(is_digit("1"))

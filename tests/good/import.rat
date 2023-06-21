@@ -1,0 +1,4 @@
+/// out: "3\n-1"
+import import_test as test
+print(test.add(1,2))
+print(test.sub(1,2))

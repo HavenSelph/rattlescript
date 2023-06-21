@@ -1,0 +1,5 @@
+/// out: "3\n2"
+
+from import_test import *
+print(add(1,2))
+print(sub(3,1))

@@ -1,0 +1,8 @@
+/// out: "9\n9\n9\n9\n10\n"
+
+let x = 10
+print(--x)
+print(x--)
+print(++x)
+print(x++)
+print(x)
