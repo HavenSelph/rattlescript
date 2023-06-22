@@ -795,7 +795,9 @@ impl Value {
                 s.push('}');
                 s
             }
-            Value::Namespace(..) => "<namespace>".to_string(),
+            Value::Namespace(_, name, scope) => {
+                format!("<namespace {}> {:#?}", name, scope.borrow().vars.clone())
+            }
         }
     }
 
