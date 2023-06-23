@@ -1,0 +1,110 @@
+class Counter {
+    def new(self, arr) {
+        self.arr = arr
+        self.count = {}
+        for item in arr {
+            if item in self.count.keys() {
+                self.count[item] += 1
+            } else {
+                self.count[item] = 1
+            }
+        }
+    }
+
+    def most_common(self) {
+        // Return the most common item in the array.
+        // If there is a tie, the first item is returned.
+        let items = self.all_most_common()
+        if items[0].len() > 0 {
+            return (items[0][0], items[1])
+        }
+        return nothing
+    }
+
+    def all_most_common(self) {
+        // Return a list of all the most common items
+        // in the array. If there is a tie, all items
+        // are returned.
+        let max = 0
+        let max_items = []
+        for item in self.count.keys() {
+            if self.count[item] > max {
+                max = self.count[item]
+                max_items = [item]
+            } else if self.count[item] == max {
+                max_items.push(item)
+            }
+        }
+        return (max_items, max)
+    }
+
+    def least_common(self) {
+        // Return the least common item in the array.
+        // If there is a tie, the first item is returned.
+        let items = self.all_least_common()
+        if items[0].len() > 0 {
+            return (items[0][0], items[1])
+        }
+        return nothing
+    }
+
+    def all_least_common(self) {
+        // Return a list of all the least common items
+        // in the array. If there is a tie, all items
+        // are returned.
+        let min = nothing
+        let min_items = []
+        for item in self.count.keys() {
+            if min == nothing {
+                min = self.count[item]
+                min_items = [item]
+            } else if self.count[item] < min {
+                min = self.count[item]
+                min_items = [item]
+            } else if self.count[item] == min {
+                min_items.push(item)
+            }
+        }
+        return (min_items, min)
+    }
+
+    def count_item(self, item) {
+        // Return the count of the given item in the array.
+        return self.count.get(item, 0)
+    }
+
+    def items(self) {
+        // Return a list of tuples of the form (item, count)
+        // for each item in the array.
+        let items = []
+        for item in self.count.keys() {
+            items.push((item, self.count[item]))
+        }
+        return items
+    }
+}
+
+class OrderedDict {
+    def new(self) {
+        // Create a new ordered dictionary.
+        self.keys = []
+        self.dict = {}
+    }
+
+    def push(self, key, value) {
+        self.dict[key] = value
+        self.keys.push(key)
+    }
+
+    def get(self, key, default=nothing) {
+        return self.dict.get(key, default)
+    }
+
+    def items(self) {
+        let items = []
+        for key in self.keys {
+            items.push((key, self.dict[key]))
+        }
+        return items
+    }
+}
