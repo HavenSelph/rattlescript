@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::common::{Location, Span};
 use crate::error::{lexer_error as error, Result};
 use crate::token::{Token, TokenKind};

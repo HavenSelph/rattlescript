@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::ast::{ArgumentType, AST};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
@@ -142,6 +147,7 @@ pub struct Class {
 pub struct ClassInstance {
     pub span: Span,
     pub name: String,
+    pub class: Ref<Class>,
     pub parents: Option<Vec<Value>>,
     pub in_initializer: bool,
     pub static_fields: Ref<HashMap<String, Value>>,
@@ -318,6 +324,17 @@ impl std::cmp::PartialEq for Value {
             (Value::ClassInstance(left), Value::ClassInstance(right)) => {
                 left.as_ptr() == right.as_ptr()
             }
+            (Value::ClassInstance(left), Value::Class(right)) => {
+                // This will check if the class instance is a subclass of the class
+                // it might not be the best way to do this, but it works.
+                left.borrow().class.as_ptr() == right.as_ptr()
+            }
+            (Value::Class(left), Value::ClassInstance(right)) => {
+                // This will check if the class instance is a subclass of the class
+                // it might not be the best way to do this, but it works.
+                // Get last parent
+                left.as_ptr() == right.borrow().class.as_ptr()
+            }
             (Value::Function(left), Value::Function(right)) => left.as_ptr() == right.as_ptr(),
             (Value::Iterator(..), Value::Iterator(..)) => false,
             (Value::Range(left_start, left_end), Value::Range(right_start, right_end)) => {
@@ -363,7 +380,7 @@ impl Value {
                 left.extend(right.iter().cloned());
                 Value::Array(make!(left))
             }
-            _ => error!(span, "Invalid types for addition"),
+            _ => error!(span, "Invalid types for addition: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -373,7 +390,7 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 - *right),
             (Value::Float(left), Value::Float(right)) => Value::Float(*left - *right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left - *right as f64),
-            _ => error!(span, "Invalid types for subtraction"),
+            _ => error!(span, "Invalid types for subtraction: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -389,7 +406,7 @@ impl Value {
                 }
                 Value::String(Rc::new(left.repeat(*right as usize)))
             }
-            _ => error!(span, "Invalid types for multiplication"),
+            _ => error!(span, "Invalid types for multiplication: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -399,7 +416,7 @@ impl Value {
             (Value::Integer(left), Value::Float(right)) => Value::Float(*left as f64 % *right),
             (Value::Float(left), Value::Float(right)) => Value::Float(*left % *right),
             (Value::Float(left), Value::Integer(right)) => Value::Float(*left % *right as f64),
-            _ => error!(span, "Invalid types for modulo"),
+            _ => error!(span, "Invalid types for modulo: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -413,7 +430,7 @@ impl Value {
             }
             (Value::Float(left), Value::Integer(right)) => Value::Float(left.powf(*right as f64)),
             (Value::Float(left), Value::Float(right)) => Value::Float(left.powf(*right)),
-            _ => error!(span, "Invalid types for exponentiation"),
+            _ => error!(span, "Invalid types for exponentiation: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -443,7 +460,7 @@ impl Value {
                 }
                 Value::Float(*left / *right as f64)
             }
-            _ => error!(span, "Invalid types for division"),
+            _ => error!(span, "Invalid types for division: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -532,6 +549,7 @@ impl Value {
                 let ClassInstance {
                     span: _,
                     name,
+                    class: _,
                     parents: _,
                     in_initializer: _,
                     static_fields,
@@ -666,18 +684,20 @@ impl Value {
             _ => error!(span, "Invalid type for not"),
         })
     }
-    pub fn and(&self, other: &Value, span: &Span) -> Result<Value> {
-        Ok(match (self, other) {
-            (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(*left && *right),
-            _ => error!(span, "Invalid types for and"),
-        })
-    }
-    pub fn or(&self, other: &Value, span: &Span) -> Result<Value> {
-        Ok(match (self, other) {
-            (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(*left || *right),
-            _ => error!(span, "Invalid types for or"),
-        })
-    }
+
+    // Removed because of short-circuiting
+    // pub fn and(&self, other: &Value, span: &Span) -> Result<Value> {
+    //     Ok(match (self, other) {
+    //         (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(*left && *right),
+    //         _ => error!(span, "Invalid types for and: {} and {}", self.type_of(), other.type_of()),
+    //     })
+    // }
+    // pub fn or(&self, other: &Value, span: &Span) -> Result<Value> {
+    //     Ok(match (self, other) {
+    //         (Value::Boolean(left), Value::Boolean(right)) => Value::Boolean(*left || *right),
+    //         _ => error!(span, "Invalid types for or: {} and {}", self.type_of(), other.type_of()),
+    //     })
+    // }
 
     pub fn contains(&self, other: &Value, span: &Span) -> Result<Value> {
         Ok(match (self, other) {
@@ -708,7 +728,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(*left < *right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(*left < *right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(*left < *right),
-            _ => error!(span, "Invalid types for less than"),
+            _ => error!(span, "Invalid types for less than: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -723,7 +743,7 @@ impl Value {
             (Value::Float(left), Value::Float(right)) => Value::Boolean(*left <= *right),
             (Value::Float(left), Value::Integer(right)) => Value::Boolean(*left <= *right as f64),
             (Value::String(left), Value::String(right)) => Value::Boolean(*left <= *right),
-            _ => error!(span, "Invalid types for less than"),
+            _ => error!(span, "Invalid types for less than: {} and {}", self.type_of(), other.type_of()),
         })
     }
 
@@ -793,7 +813,9 @@ impl Value {
                 s.push('}');
                 s
             }
-            Value::Namespace(..) => "<namespace>".to_string(),
+            Value::Namespace(_, name, scope) => {
+                format!("<namespace {}> {:#?}", name, scope.borrow().vars.clone())
+            }
         }
     }
 
@@ -883,6 +905,7 @@ impl Value {
                 let ClassInstance {
                     span: _,
                     name,
+                    class: _,
                     parents: _,
                     in_initializer,
                     static_fields,

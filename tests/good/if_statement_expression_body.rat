@@ -1,0 +1,2 @@
+/// out: "true"
+if (true) print("true")

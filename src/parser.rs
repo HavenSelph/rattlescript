@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::ast::ArgumentType::{Keyword, Positional, Variadic, VariadicKeyword};
 use crate::ast::{ArgumentType, CallArgs, FunctionArgs, ImportObject, AST};
 use crate::common::Span;
@@ -512,6 +517,16 @@ impl Parser {
         })
     }
 
+    fn parse_block_or_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
+        match self.cur() {
+            Token {
+                kind: TokenKind::LeftBrace,
+                ..
+            } => self.parse_block(false),
+            _ => self.parse_statement(until),
+        }
+    }
+
     fn parse_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
         match self.cur() {
             Token {
@@ -587,7 +602,8 @@ impl Parser {
             } => {
                 self.increment();
                 let cond = self.parse_expression()?;
-                let body = self.parse_block(/*global*/ false)?;
+                // let body = self.parse_block(/*global*/ false)?;
+                let body = self.parse_block_or_statement(until.clone())?;
                 let span = span.extend(body.span());
                 match self.cur() {
                     Token {
@@ -596,9 +612,12 @@ impl Parser {
                         ..
                     } => {
                         self.increment();
-                        let else_body = match self.cur().kind {
-                            TokenKind::If => self.parse_statement(until)?,
-                            _ => self.parse_block(/*global*/ false)?,
+                        let else_body = match self.cur() {
+                            Token {
+                                kind: TokenKind::If,
+                                ..
+                            } => self.parse_statement(until)?,
+                            _ => self.parse_block_or_statement(until)?,
                         };
                         Ok(Rc::new(AST::If(
                             span.extend(else_body.span()),

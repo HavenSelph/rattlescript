@@ -1,0 +1,43 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+*/
+
+class Token {
+    def new(self, type, data) {
+        self.type = type
+        self.data = data
+    }
+
+    def repr(self) => `Token({self.type}, {self.data})`
+}
+
+namespace TokenType {
+    // This is a hack to kind of emulate an enum
+    let Identifier = 0
+    let Number = 1
+    let String = 2
+
+    let Plus = 3
+    let Minus = 4
+    let Star = 5
+    let Slash = 6
+    let Caret = 7
+
+    let LParen = 8
+    let RParen = 9
+    let Equals = 10
+
+    let EOF = 11
+}
+
+let chars = {
+    "+":TokenType.Plus,
+    "-":TokenType.Minus,
+    "*":TokenType.Star,
+    "/":TokenType.Slash,
+    "^":TokenType.Caret,
+    "=":TokenType.Equals,
+    "(":TokenType.LParen,
+    ")":TokenType.RParen
+}

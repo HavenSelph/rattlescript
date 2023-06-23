@@ -3,7 +3,7 @@
 # RattleScript is...
 An interpreted, dynamic, and expressive programming language written in Rust! It started as a small development project with a friend of mine, but has quickly turned into a passion! I hope to continue working on this project and one day host a whole standard library of functions and modules for people to use. Every week the feature list grows, and I'm excited to see where this project ends up!
 
-RattleScript is licensed under the [MIT](https://github.com/HavenSelph/rattlescript/blob/main/LICENSE.md) license, learn more about what it permits [here](https://choosealicense.com/licenses/mit/).
+RattleScript is licensed under the [GNU General Public License v3.0](<https://www.gnu.org/licenses/quick-guide-gplv3.html>).
 
 # Contributing
 Want to contribute? That's awesome! Go ahead and fork the repository and make a pull request! I'll be sure to review it as soon as I can. However, please make sure to make sure your contribution...

@@ -1,3 +1,4 @@
 def is_space(c) => c in [" ", "\t", "\n", "\r"]
 def is_alpha(c) => c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVQXYZ"
 def is_digit(c) => c in "0123456789"
+def is_alnum(c) => is_alpha(c) or is_digit(c)

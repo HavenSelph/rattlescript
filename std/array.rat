@@ -1,0 +1,47 @@
+// Various functions to work on arrays
+
+def any(arr) {
+    for item in arr {
+        if item {
+            return true
+        }
+    }
+    return false
+}
+
+def all(arr) {
+    for item in arr {
+        if not item {
+            return false
+        }
+    }
+    return true
+}
+
+def sum(arr) {
+    var total = 0
+    for num in arr {
+        total += num
+    }
+    total
+}
+
+def max(arr) {
+    var max = arr[0]
+    for num in arr {
+        if num > max {
+            max = num
+        }
+    }
+    max
+}
+
+def min(arr) {
+    var min = arr[0]
+    for num in arr {
+        if num < min {
+            min = num
+        }
+    }
+    min
+}

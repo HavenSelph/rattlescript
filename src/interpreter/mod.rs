@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::ast::ArgumentType::Keyword;
 use crate::ast::{ArgumentType, CallArgs, AST};
 use crate::common::{make, Ref, Span};
@@ -147,28 +152,58 @@ impl Interpreter {
 
             AST::Plus(span, left, right) => dispatch_op!(span, Value::plus, left, right),
             AST::Minus(span, left, right) => dispatch_op!(span, Value::minus, left, right),
-            AST::Multiply(loc, left, right) => dispatch_op!(loc, Value::multiply, left, right),
-            AST::Power(loc, left, right) => dispatch_op!(loc, Value::power, left, right),
-            AST::Divide(loc, left, right) => dispatch_op!(loc, Value::divide, left, right),
-            AST::Modulo(loc, left, right) => dispatch_op!(loc, Value::modulo, left, right),
-            AST::Negate(loc, expr) => dispatch_op!(loc, Value::negate, expr),
-            AST::Not(loc, expr) => dispatch_op!(loc, Value::not, expr),
-            AST::And(loc, left, right) => dispatch_op!(loc, Value::and, left, right),
-            AST::Or(loc, left, right) => dispatch_op!(loc, Value::or, left, right),
-            AST::In(loc, left, right) => dispatch_op!(loc, Value::contains, right, left),
-
-            AST::Equals(loc, left, right) => dispatch_op!(loc, Value::equals, left, right),
-            AST::NotEquals(loc, left, right) => dispatch_op!(loc, Value::not_equals, left, right),
-            AST::LessThan(loc, left, right) => dispatch_op!(loc, Value::less_than, left, right),
-
-            AST::GreaterThan(loc, left, right) => {
-                dispatch_op!(loc, Value::greater_than, left, right)
+            AST::Multiply(span, left, right) => dispatch_op!(span, Value::multiply, left, right),
+            AST::Power(span, left, right) => dispatch_op!(span, Value::power, left, right),
+            AST::Divide(span, left, right) => dispatch_op!(span, Value::divide, left, right),
+            AST::Modulo(span, left, right) => dispatch_op!(span, Value::modulo, left, right),
+            AST::Negate(span, expr) => dispatch_op!(span, Value::negate, expr),
+            AST::Not(span, expr) => dispatch_op!(span, Value::not, expr),
+            AST::And(_, _left, _right) => {
+                // Short circuiting
+                let left = self.run(_left, scope.clone())?;
+                match left {
+                    Value::Boolean(false) => return Ok(left),
+                    Value::Boolean(true) => {
+                        let right = self.run(_right, scope)?;
+                        match right {
+                            Value::Boolean(true) => return Ok(right),
+                            Value::Boolean(false) => return Ok(right),
+                            _ => error!(_right.span(), "Expected boolean, but got {}", right.type_of()),
+                        }
+                    }
+                    _ => error!(_left.span(), "Expected boolean, but got {}", left.type_of()),
+                }
             }
-            AST::LessEquals(loc, left, right) => {
-                dispatch_op!(loc, Value::less_equals, left, right)
+            AST::Or(_, _left, _right) => {
+                // Short circuiting
+                let left = self.run(_left, scope.clone())?;
+                match left {
+                    Value::Boolean(true) => return Ok(left),
+                    Value::Boolean(false) => {
+                        let right = self.run(_right, scope)?;
+                        match right {
+                            Value::Boolean(true) => return Ok(right),
+                            Value::Boolean(false) => return Ok(right),
+                            _ => error!(_right.span(), "Expected boolean, but got {}", right.type_of()),
+                        }
+                    }
+                    _ => error!(_left.span(), "Expected boolean, but got {}", left.type_of()),
+                }
             }
-            AST::GreaterEquals(loc, left, right) => {
-                dispatch_op!(loc, Value::greater_equals, left, right)
+            AST::In(span, left, right) => dispatch_op!(span, Value::contains, right, left),
+
+            AST::Equals(span, left, right) => dispatch_op!(span, Value::equals, left, right),
+            AST::NotEquals(span, left, right) => dispatch_op!(span, Value::not_equals, left, right),
+            AST::LessThan(span, left, right) => dispatch_op!(span, Value::less_than, left, right),
+
+            AST::GreaterThan(span, left, right) => {
+                dispatch_op!(span, Value::greater_than, left, right)
+            }
+            AST::LessEquals(span, left, right) => {
+                dispatch_op!(span, Value::less_equals, left, right)
+            }
+            AST::GreaterEquals(span, left, right) => {
+                dispatch_op!(span, Value::greater_equals, left, right)
             }
 
             AST::Call(span, func, args) => self.handle_call(scope, span, func, args)?,
@@ -842,7 +877,7 @@ impl Interpreter {
                                 seen.push(name.clone());
                                 state = Keyword;
                             } else {
-                                error!(span, "Unexpected keyword argument: `{}`", name);
+                                error!(span, "Unexpected keyword  in {}: `{}`", func.name, name);
                             }
                         }
                         None => {
@@ -865,7 +900,7 @@ impl Interpreter {
                                 variadic.push(arg.clone());
                                 state = ArgumentType::Variadic;
                             } else {
-                                error!(span, "Unexpected positional argument");
+                                error!(span, "Unexpected positional argument in {}", func.name);
                             }
                         }
                     }
@@ -924,6 +959,7 @@ impl Interpreter {
                 let mut instance = Value::ClassInstance(make!(ClassInstance {
                     span: *span,
                     name: name.clone(),
+                    class: _class.clone(),
                     parents: class.parents.clone(),
                     in_initializer: true,
                     static_fields: class.static_fields.clone(),

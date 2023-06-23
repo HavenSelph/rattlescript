@@ -1,8 +1,13 @@
+from std.array import (max as max_a, min as min_a)
+
 // Constants
 let pi = 3.141592653589793
 let e = 2.718281828459045
 
 // Helper functions
+def max(*args) => max_a(args)
+def min(*args) => min_a(args)
+
 def factorial(n) {
     if n == 0 {
         return 1
@@ -24,18 +29,6 @@ def abs(x) {
 }
 
 def sqrt(x) => x ** 0.5
-
-def add(x, y) => x + y
-
-def sub(x, y) => x - y
-
-def mul(x, y) => x * y
-
-def div(x, y) => x / y
-
-def mod(x, y) => x % y
-
-def pow(x, y) => x ** y
 
 def sin(x) {
     let sum = 0

@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::common::Span;
 use std::collections::HashMap;
 use std::rc::Rc;

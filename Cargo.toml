@@ -1,8 +1,15 @@
 [package]
 name = "rattlescript"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
+authors = ["Haven Selph <havenselph@gmail.com>"]
+description = "A simple scripting language written in Rust."
+keywords = ["scripting", "language", "rust", "rattlescript"]
+repository = "https://github.com/HavenSelph/rattlescript"
+license-file = "./LICENSE.md"
+readme = "./README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# None!
