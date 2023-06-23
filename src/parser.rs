@@ -512,13 +512,13 @@ impl Parser {
         })
     }
 
-    fn parse_block_or_expression(&mut self) -> Result<Rc<AST>> {
+    fn parse_block_or_statement(&mut self, until: TokenKind) -> Result<Rc<AST>> {
         match self.cur() {
             Token {
                 kind: TokenKind::LeftBrace,
                 ..
             } => self.parse_block(false),
-            _ => self.parse_expression(),
+            _ => self.parse_statement(until),
         }
     }
 
@@ -598,7 +598,7 @@ impl Parser {
                 self.increment();
                 let cond = self.parse_expression()?;
                 // let body = self.parse_block(/*global*/ false)?;
-                let body = self.parse_block_or_expression()?;
+                let body = self.parse_block_or_statement(until.clone())?;
                 let span = span.extend(body.span());
                 match self.cur() {
                     Token {
@@ -612,7 +612,7 @@ impl Parser {
                                 kind: TokenKind::If,
                                 ..
                             } => self.parse_statement(until)?,
-                            _ => self.parse_block_or_expression()?,
+                            _ => self.parse_block_or_statement(until)?,
                         };
                         Ok(Rc::new(AST::If(
                             span.extend(else_body.span()),
