@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2023  Haven Selph
+    Copyright (C) 2023  Mustafa Quraish
     Check the LICENSE file for more information.
  */
 
