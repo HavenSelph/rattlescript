@@ -1189,6 +1189,9 @@ impl Parser {
                 }
                 _ => break,
             }
+            if self.cur().newline_before {
+                break;
+            }
         }
         Ok(val)
     }

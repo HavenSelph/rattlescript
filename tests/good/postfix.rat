@@ -4,3 +4,5 @@
 
 let x = 10
 [y for y in 0..12]
+let s = new_random_state()
+[y for y in 0..12]
