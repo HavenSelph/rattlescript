@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::{CallArgValues, Value};

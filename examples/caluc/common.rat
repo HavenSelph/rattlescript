@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+*/
+
 class Token {
     def new(self, type, data) {
         self.type = type

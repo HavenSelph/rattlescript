@@ -1,3 +1,8 @@
+/*
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+ */
+
 use crate::ast::ArgumentType::{Keyword, Positional, Variadic, VariadicKeyword};
 use crate::ast::{ArgumentType, CallArgs, FunctionArgs, ImportObject, AST};
 use crate::common::Span;

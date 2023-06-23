@@ -1,7 +1,6 @@
 /*
-    This file is part of Caluc, an example calculator program
-    written in Rattlescript. It is under the same license as
-    described in the LICENSE file.
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
 
     This file contains the Lexer. The Lexer is responsible for
     converting a string into a list of tokens. The tokens are

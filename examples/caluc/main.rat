@@ -1,7 +1,11 @@
 /*
-    This is the main file for Caluc, an example calculator program
-    written in Rattlescript. It is under the same license as described
-    in the LICENSE file.
+    Copyright (C) 2023  Haven Selph
+    Check the LICENSE file for more information.
+
+    This file is the REPL for Caluc. It is a simple calculator that
+    can be used to evaluate expressions. It is not meant to be
+    a programming language, but rather an interesting example
+    of what Rattlescript can do.
 
     Usage:
     Caluc uses a REPL (Read-Eval-Print Loop) interface. To use it, simply
