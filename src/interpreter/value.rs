@@ -7,6 +7,7 @@ use crate::ast::{ArgumentType, AST};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::{Interpreter, Scope};
+use crate::interpreter::random::RandomState;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -197,6 +198,7 @@ pub enum Value {
     Dict(Ref<HashMap<Value, Value>>),
     String(Rc<String>),
     Namespace(Span, String, Ref<Scope>),
+    RandomState(Ref<RandomState>),
 }
 
 impl Value {
@@ -288,6 +290,7 @@ impl std::fmt::Debug for Value {
                 write!(f, "}}")
             }
             Value::Namespace(_, name, _) => write!(f, "<namespace {}>", name),
+            Value::RandomState(_) => write!(f, "<random-state>"),
         }
     }
 }
@@ -620,6 +623,8 @@ impl Value {
                 "iter" => builtin!(to_iter),
                 "dbg" => builtin!(debug),
                 "strip" => builtin!(strip),
+                "lower" => builtin!(lower),
+                "upper" => builtin!(upper),
                 _ => {
                     error!(span, "Field '{}' not found on string", field);
                 }
@@ -659,6 +664,13 @@ impl Value {
                     error!(span, "Field '{}' not found on nothing", field);
                 }
             },
+            Value::RandomState(_) => match field.as_str() {
+                "rand_f" => builtin!(randf),
+                "rand_i" => builtin!(randi),
+                _ => {
+                    error!(span, "Field '{}' not found on random state", field);
+                }
+            }
             _ => {
                 error!(
                     span,
@@ -816,6 +828,7 @@ impl Value {
             Value::Namespace(_, name, scope) => {
                 format!("<namespace {}> {:#?}", name, scope.borrow().vars.clone())
             }
+            Value::RandomState(_) => "<random-state>".to_string(),
         }
     }
 
@@ -969,6 +982,7 @@ impl Value {
             Value::Dict(..) => "Dict",
             Value::Iterator(..) => "Iterator",
             Value::Namespace(..) => "Namespace",
+            Value::RandomState(..) => "RandomState",
         }
     }
 

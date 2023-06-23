@@ -7,6 +7,7 @@ use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::{CallArgValues, Value};
 use crate::interpreter::{Interpreter, Scope};
+use crate::interpreter::random::RandomState;
 use std::io::{Read, Write};
 use std::rc::Rc;
 
@@ -296,6 +297,38 @@ pub fn strip(
     )))
 }
 
+pub fn lower(
+    _interpreter: &mut Interpreter,
+    _scope: Ref<Scope>,
+    span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    if args.len() != 1 {
+        error!(span, "lower() takes exactly one argument");
+    }
+    let string = match &args[0] {
+        Value::String(string) => string.to_string(),
+        _ => error!(span, "lower() may only take a string as argument"),
+    };
+    Ok(Value::String(Rc::new(string.to_lowercase())))
+}
+
+pub fn upper(
+    _interpreter: &mut Interpreter,
+    _scope: Ref<Scope>,
+    span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    if args.len() != 1 {
+        error!(span, "upper() takes exactly one argument");
+    }
+    let string = match &args[0] {
+        Value::String(string) => string.to_string(),
+        _ => error!(span, "upper() may only take a string as argument"),
+    };
+    Ok(Value::String(Rc::new(string.to_uppercase())))
+}
+
 pub fn join(
     _interpreter: &mut Interpreter,
     _scope: Ref<Scope>,
@@ -552,4 +585,59 @@ pub fn debug(
     }
     println!("{:?}", args[0]);
     Ok(args[0].clone())
+}
+
+pub fn new_random_state(
+    _interpreter: &mut Interpreter,
+    _scope: Ref<Scope>,
+    span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    if args.len() != 0 {
+        error!(span, "rand() takes no arguments");
+    }
+    Ok(Value::RandomState(make!(RandomState::new())))
+}
+
+pub fn randf(
+    _interpreter: &mut Interpreter,
+    _scope: Ref<Scope>,
+    span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    if args.len() != 1 {
+        error!(span, "randf() takes at most one argument");
+    }
+    let state = match args[0] {
+        Value::RandomState(ref state) => state,
+        _ => error!(span, "randf() may only take a random state as argument"),
+    };
+    let random = state.borrow_mut().next();
+    Ok(Value::Float(random as f64 / (2.0f64).powi(64)))
+}
+
+pub fn randi(
+    _interpreter: &mut Interpreter,
+    _scope: Ref<Scope>,
+    span: &Span,
+    args: Vec<Value>,
+) -> Result<Value> {
+    let state = match args.get(0) {
+        Some(Value::RandomState(ref state)) => state,
+        _ => error!(span, "randi() requires a random state as first argument"),
+    };
+    let (min, max) = match args.len() {
+        1 => (0, 2),
+        2 => match args[1] {
+            Value::Integer(min) => (0, min),
+            _ => error!(span, "randi() may only take an integer as argument"),
+        },
+        3 => match (&args[1], &args[2]) {
+            (Value::Integer(min), Value::Integer(max)) => (*min, *max),
+            _ => error!(span, "randi() may only take integers as arguments"),
+        },
+        _ => error!(span, "randi() takes at most two arguments"),
+    };
+    let random = state.borrow_mut().next() as i64;
+    Ok(Value::Integer(min + if random > 0 { random } else { -random } % (max - min)))
 }

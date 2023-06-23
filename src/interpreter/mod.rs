@@ -16,6 +16,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 mod builtin;
+mod random;
 pub mod value;
 
 #[derive(Debug)]
@@ -359,6 +360,7 @@ impl Interpreter {
                 "open" => builtin!(file_open),
                 "exit" => builtin!(exit),
                 "dump" => builtin!(dump),
+                "new_random_state" => builtin!(new_random_state),
                 _ => match scope.borrow().get(name) {
                     Some(val) => val,
                     None => {

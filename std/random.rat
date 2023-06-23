@@ -1,0 +1,16 @@
+
+class Random {
+    def new(self) { self.state = new_random_state() }
+    def randint(self, a=0, b=2) { return self.state.rand_i(a, b) }
+    def rand(self) { return self.state.rand_f() }
+    def choice(self, arr) { return arr[self.state.rand_i(0,arr.len())]  }
+    def shuffle(self, arr) {
+        for i in 0..arr.len() {
+            let j = self.state.rand_i(0, i+1)
+            let temp = arr[i]
+            arr[i] = arr[j]
+            arr[j] = temp
+        }
+        return arr
+    }
+}
