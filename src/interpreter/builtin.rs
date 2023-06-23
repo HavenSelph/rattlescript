@@ -155,18 +155,23 @@ pub fn dict_get(
     span: &Span,
     args: Vec<Value>,
 ) -> Result<Value> {
-    if args.len() != 2 {
-        error!(span, "dict_get() takes exactly two arguments");
+    if args.len() < 2 || args.len() > 3 {
+        error!(span, "dict_get() takes two or three arguments");
     }
     let dict = match &args[0] {
         Value::Dict(dict) => dict,
         _ => error!(span, "dict_get() may only take a dict as first argument"),
     };
     let key = &args[1];
+    let default = if args.len() == 3 {
+        &args[2]
+    } else {
+        &Value::Nothing
+    };
     let dict = dict.borrow();
     match dict.get(key) {
         Some(value) => Ok(value.clone()),
-        None => Ok(Value::Nothing),
+        None => Ok(default.clone()),
     }
 }
 
@@ -190,6 +195,7 @@ pub fn dict_items(
     }
     Ok(Value::Array(make!(items)))
 }
+
 
 pub fn dict_keys(
     _interpreter: &mut Interpreter,
