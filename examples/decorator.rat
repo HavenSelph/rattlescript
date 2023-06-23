@@ -1,0 +1,21 @@
+
+
+def message(before, after=nothing) {
+    def inner(fn) {
+        def wrapper(*args, **kwargs) {
+            print(before)
+            fn(*args, **kwargs)
+            if (after != nothing) print(after)
+        }
+        return wrapper
+    }
+    return inner
+}
+
+
+@message("adding", after:"added")
+def adder(a, b) {
+    return a + b
+}
+
+adder(1, 2)
