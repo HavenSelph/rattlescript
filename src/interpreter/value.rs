@@ -142,6 +142,7 @@ pub struct Class {
 pub struct ClassInstance {
     pub span: Span,
     pub name: String,
+    pub class: Ref<Class>,
     pub parents: Option<Vec<Value>>,
     pub in_initializer: bool,
     pub static_fields: Ref<HashMap<String, Value>>,
@@ -532,6 +533,7 @@ impl Value {
                 let ClassInstance {
                     span: _,
                     name,
+                    class: _,
                     parents: _,
                     in_initializer: _,
                     static_fields,
@@ -887,6 +889,7 @@ impl Value {
                 let ClassInstance {
                     span: _,
                     name,
+                    class: _,
                     parents: _,
                     in_initializer,
                     static_fields,

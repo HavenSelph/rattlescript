@@ -954,6 +954,7 @@ impl Interpreter {
                 let mut instance = Value::ClassInstance(make!(ClassInstance {
                     span: *span,
                     name: name.clone(),
+                    class: _class.clone(),
                     parents: class.parents.clone(),
                     in_initializer: true,
                     static_fields: class.static_fields.clone(),
