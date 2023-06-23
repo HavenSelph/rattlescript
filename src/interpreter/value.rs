@@ -319,6 +319,17 @@ impl std::cmp::PartialEq for Value {
             (Value::ClassInstance(left), Value::ClassInstance(right)) => {
                 left.as_ptr() == right.as_ptr()
             }
+            (Value::ClassInstance(left), Value::Class(right)) => {
+                // This will check if the class instance is a subclass of the class
+                // it might not be the best way to do this, but it works.
+                left.borrow().class.as_ptr() == right.as_ptr()
+            }
+            (Value::Class(left), Value::ClassInstance(right)) => {
+                // This will check if the class instance is a subclass of the class
+                // it might not be the best way to do this, but it works.
+                // Get last parent
+                left.as_ptr() == right.borrow().class.as_ptr()
+            }
             (Value::Function(left), Value::Function(right)) => left.as_ptr() == right.as_ptr(),
             (Value::Iterator(..), Value::Iterator(..)) => false,
             (Value::Range(left_start, left_end), Value::Range(right_start, right_end)) => {
