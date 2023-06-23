@@ -1,0 +1,71 @@
+/*
+    This is the main file for Caluc, an example calculator program
+    written in Rattlescript. It is under the same license as described
+    in the LICENSE file.
+
+    Usage:
+    Caluc uses a REPL (Read-Eval-Print Loop) interface. To use it, simply
+    run this file using the Rattlescript interpreter. You can then type
+    in expressions and have them evaluated. To exit, type "exit" and press
+    enter.
+
+    Features:
+    Arithmetic operations: +, -, *, /, %
+    Variables: x = 5
+*/
+// Imports
+from lexer import Lexer
+from parser import Parser
+
+// REPL
+let header = "Caluc REPL | Type 'exit' to exit."
+print(header)
+
+def parse_until_complete() {
+    let inp = ""
+    let prompt = "Caluc >>> "
+    let ast = nothing
+    while ast == nothing {
+        let temp = input(prompt)
+        prompt = "Caluc ... "
+        inp += temp + "\n"
+        if inp == "exit" {
+            exit()
+        }
+
+        // Lex the input
+        let lexer = Lexer(inp)
+        let lex_response = lexer.lex()
+        if lex_response.tokens == nothing {
+            print(`Lexer error: {lex_response.msg}`)
+            return nothing
+        }
+        let tokens = lex_response.tokens
+
+        // Parse the tokens, if error is recoverable, continue
+        // if parser fails, and temp == "", print error and return
+        let parser = Parser(tokens)
+        let ast = parser.parse()  // Will return a ParserResponse object
+        if ast.ast == nothing {
+            if ast.recoverable == false or temp == "" {
+                print(`Parser error: {ast.msg}`)
+                return nothing
+            }
+            continue
+        }
+        return ast.ast
+    }
+}
+let context = {"last":0}
+while true {
+    // Lex and parse the input
+    let ast = parse_until_complete()
+    if ast == nothing {
+        continue
+    }
+
+    // Evaluate the AST
+    let val = ast.run(context)
+    context["last"] = val
+    print(val)
+}

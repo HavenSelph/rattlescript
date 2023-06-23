@@ -1,0 +1,105 @@
+/*
+    This file is part of Caluc, an example calculator program
+    written in Rattlescript. It is under the same license as
+    described in the LICENSE file.
+
+    This file contains the Lexer. The Lexer is responsible for
+    converting a string into a list of tokens. The tokens are
+    then passed to the Parser, which converts the tokens into
+    an AST.
+
+    This Lexer is extremely simple. It only supports words,
+    numbers, and operators.
+
+    The Lexer will return a LexerResponse object. This object
+    contains a list of tokens and a message. The message is
+    used to indicate whether or not the lexing was successful.
+*/
+
+import std.string
+from common import (chars, Token, TokenType)
+
+
+class LexerResponse {
+    // LexerResponse is a workaround since Rattlescript currently doesn't have
+    // error handling.
+    def new(self, tokens, msg="success") {
+        self.msg = msg
+        self.tokens = tokens
+    }
+}
+
+class Lexer {
+    def new(self, source) {
+        self.source = source
+        self.index = 0
+    }
+
+    def next(self) {
+        self.index += 1
+        return self.cur()
+    }
+
+    def cur(self) {
+        if (self.index >= self.source.len()) {
+            return nothing
+        }
+        return self.source[self.index]
+    }
+
+
+    def lex(self) {
+        let tokens = []
+        while self.cur() != nothing {
+            if string.is_space(self.cur()) {
+                self.index += 1
+                continue
+            } else if string.is_alpha(self.cur()) {
+                tokens.push(self.lex_word())
+            } else if string.is_digit(self.cur()) {
+                tokens.push(self.lex_number())
+            } else if self.cur() in chars {
+                tokens.push(Token(chars[self.cur()], self.cur()))
+                self.next()
+            } else {
+                // FixMe: Defaults cannot be used as positional arguments
+                // Due to a bug, I have to prefix the message parameter with msg:
+                // This behavior is likely due to my argument parser not keeping track
+                // of the current parameter that an argument should be pushed to.
+                return LexerResponse(nothing, msg:`Unexpected character: {self.cur()}`)
+            }
+        }
+
+        // Insert EOF token
+        tokens.push(Token(TokenType.EOF, nothing))
+        return LexerResponse(tokens)
+    }
+
+    def lex_word(self) {
+        let word = ""
+        while self.cur() != nothing and (string.is_alnum(self.cur()) or self.cur() == "_") {
+            word += self.cur()
+            self.next()
+        }
+        return Token(TokenType.Identifier, word)
+    }
+
+    def lex_number(self) {
+        let number = self.lex_int()
+        if self.cur() == "." {
+            number += "."
+            self.next()
+            number += self.lex_int()
+        }
+        return Token(TokenType.Number, number.float())
+    }
+
+    def lex_int(self) {
+        let number = ""
+        while self.cur() != nothing and string.is_digit(self.cur()) {
+            number += self.cur()
+            self.next()
+        }
+        return number
+    }
+}

@@ -1,0 +1,74 @@
+class VariableAssignment {
+    def new(self, name, expr) {
+        self.name = name
+        self.expr = expr
+    }
+
+    def run(self, ctx) {
+        let val = self.expr.run(ctx)
+        ctx[self.name] = val
+        return val
+    }
+}
+
+class Variable {
+    def new(self, name) {
+        self.name = name
+    }
+
+    def run(self, ctx) {
+        return ctx[self.name]
+    }
+}
+
+class Number {
+    def new(self, value) {
+        self.value = value
+    }
+
+    def run(self, ctx) {
+        return self.value
+    }
+}
+
+class BinaryOp {
+    def new(self, left, right) {
+        self.left = left
+        self.right = right
+    }
+
+    def run(self, ctx) {
+        print(`run not implemented on {self}`)
+        exit(1)
+    }
+}
+
+class Add(BinaryOp) {
+    def run(self, ctx) {
+        return self.left.run(ctx) + self.right.run(ctx)
+    }
+}
+
+class Subtract(BinaryOp) {
+    def run(self, ctx) {
+        return self.left.run(ctx) - self.right.run(ctx)
+    }
+}
+
+class Multiply(BinaryOp) {
+    def run(self, ctx) {
+        return self.left.run(ctx) * self.right.run(ctx)
+    }
+}
+
+class Divide(BinaryOp) {
+    def run(self, ctx) {
+        return self.left.run(ctx) / self.right.run(ctx)
+    }
+}
+
+class Power(BinaryOp) {
+    def run(self, ctx) {
+        return self.left.run(ctx) ** self.right.run(ctx)
+    }
+}

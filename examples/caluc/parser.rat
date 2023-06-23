@@ -1,0 +1,147 @@
+/*
+    This file is part of Caluc, an example calculator program
+    written in Rattlescript. It is under the same license as
+    described in the LICENSE file.
+
+    This file contains the parser for the calculator. It takes
+    a list of tokens and turns it into an AST.
+
+    The parser is a recursive descent parser, and returns
+    a ParserResponse object. This object contains the AST
+    or an error message if there was an error.
+*/
+import interpreter
+from common import TokenType
+
+
+class ParserResponse {
+    def new(self, ast, msg=nothing, recoverable=false) {
+        self.ast = ast
+        self.msg = msg
+        self.recoverable = recoverable
+    }
+}
+
+class Parser {
+    def new(self, tokens) {
+        self.tokens = tokens
+        self.pos = 0
+        self.cur = self.tokens[0]
+        self.error = nothing
+        self.error_recoverable = false
+    }
+
+    def next(self) {
+        if self.cur.type != TokenType.EOF {
+            self.pos += 1
+        }
+        self.cur = self.tokens[self.pos]
+    }
+
+    def parse(self) {
+        let ast = self.parse_expression()
+        if ast == nothing {
+            return ParserResponse(nothing, msg:self.error, recoverable:self.error_recoverable)
+        }
+        return ParserResponse(ast)
+    }
+
+    def parse_expression(self) {
+        return self.parse_assignment()
+    }
+
+    def parse_assignment(self) {
+        let left = self.parse_addition()
+        if left == nothing return left
+        if self.cur != nothing and self.cur.type == TokenType.Equals {
+            self.next()
+            let right = self.parse_assignment()
+            if right == nothing return right
+            if left != interpreter.Variable {
+                self.error = "Left side of assignment must be a variable"
+                return nothing
+            }
+            if left.name == "last" {
+                self.error = "Cannot assign to last, it is reserved for the last result"
+                return nothing
+            }
+            left = interpreter.VariableAssignment(left.name, right)
+        }
+        return left
+    }
+
+    def parse_addition(self) {
+        let left = self.parse_multiplication()
+        if left == nothing return left
+        while self.cur != nothing and self.cur.type in [TokenType.Plus, TokenType.Minus] {
+            let op = self.cur.type
+            self.next()
+            let right = self.parse_multiplication()
+            if right == nothing return right
+            if op == TokenType.Plus {
+                left = interpreter.Add(left, right)
+            } else {
+                left = interpreter.Subtract(left, right)
+            }
+        }
+        return left
+    }
+
+    def parse_multiplication(self) {
+        let left = self.parse_power()
+        if left == nothing return left
+        while self.cur != nothing and self.cur.type in [TokenType.Star, TokenType.Slash] {
+            let op = self.cur.type
+            self.next()
+            let right = self.parse_power()
+            if right == nothing return right
+            if op == TokenType.Star {
+                left = interpreter.Multiply(left, right)
+            } else {
+                left = interpreter.Divide(left, right)
+            }
+        }
+        return left
+    }
+
+    def parse_power(self) {
+        let left = self.parse_atom()
+        if left == nothing return left
+        while self.cur != nothing and self.cur.type == TokenType.Caret {
+            self.next()
+            let right = self.parse_power()
+            if right == nothing return right
+            left = interpreter.Power(left, right)
+        }
+        return left
+    }
+
+    def parse_atom(self) {
+        if self.cur.type == TokenType.Number {
+            let num = interpreter.Number(self.cur.data)
+            self.next()
+            return num
+        } else if self.cur.type == TokenType.Identifier {
+            let name = interpreter.Variable(self.cur.data)
+            self.next()
+            return name
+        } else if self.cur.type == TokenType.LParen {
+            self.next()
+            let expr = self.parse_expression()
+            if expr == nothing return expr
+            if self.cur == nothing or self.cur.type != TokenType.RParen {
+                self.error = "Expected closing parenthesis"
+                self.error_recoverable = true
+                return nothing
+            }
+            self.next()
+            return expr
+        } else if self.cur.type == TokenType.EOF {
+            self.error = "Unexpected end of input"
+            self.error_recoverable = true
+            return nothing
+        }
+        self.error = `Unexpected token {self.cur.type}`
+        return nothing
+    }
+}
