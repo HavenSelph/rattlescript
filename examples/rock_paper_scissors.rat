@@ -1,0 +1,13 @@
+let random_state = new_random_state()
+let states = {1: "You tied!", 2: "You lost!", 3: "You won!"}
+while true {
+    let inp = input("[R]ock | [P]aper | [S]cissors | [Q]uit >>> ")
+    let pc_choice = random_state.rand_i(0,3)
+    if inp.lower() in ["q", "quit"] {
+        break
+    } else if not (inp.lower() in ["r", "p", "s", "rock", "paper", "scissors"]) {
+        print("Invalid input!")
+    } else {
+        print(states[pc_choice])
+    }
+}
