@@ -108,3 +108,100 @@ class OrderedDict {
         return items
     }
 }
+
+class LinkedList {
+    static class Node {
+        def new(self, val, next=nothing) {
+            self.next = next
+            self.val = val
+        }
+    }
+
+    def new(self) {
+        self.head = nothing
+        self.len = 0
+    }
+
+    def get(self, idx) {
+        if idx > self.len or 0 > idx {
+            print(`Index '{idx}' out of bounds`)
+            exit(1)
+        }
+        let cur = self.head
+        let i = 0
+        while i != idx {
+            cur = cur.next
+            i++
+        }
+        return cur
+    }
+
+    def push(self, val) {
+        if self.head == nothing {
+            self.head = Node(val)
+        } else {
+            let cur = self.head
+            self.head = self.Node(val, next:cur)
+        }
+        self.len++
+    }
+
+    def push_many(self, *vals) {
+        for val in vals {
+            self.push(val)
+        }
+    }
+
+    def push_at(self, idx, val) {
+        if idx == 0 {
+            self.push(val)
+            return nothing
+        }
+        if idx > self.len or 0 > idx {
+            print(`Index '{idx}' out of bounds`)
+            exit(1)
+        }
+        let node = self.get(idx-1)
+        let cur = node.next
+        node.next = self.Node(val, next:cur)
+        self.len++
+    }
+
+    def pop(self) {
+        if self.len == 0 {
+            print("Cannot pop on an empty linked list.")
+            exit(1)
+        }
+        self.head = self.head.next
+        self.len--
+        return self.head
+    }
+
+    def pop_at(self, idx) {
+        if idx == 0 {
+            return self.pop()
+        }
+        if idx > self.len or 0 > idx {
+            print(`Index '{idx}' out of bounds`)
+            exit(1)
+        }
+        let node = self.get(idx-1)
+        let popped = node.next
+        node.next = popped.next
+        self.len--
+        return popped
+    }
+
+    def print(self) {
+        let out = "Linked list: "
+        let cur = self.head
+        while cur != nothing {
+            out += repr(cur.val)
+            if cur.next != nothing {
+                out += " -> "
+            }
+            cur = cur.next
+        }
+        print(out)
+    }
+}
