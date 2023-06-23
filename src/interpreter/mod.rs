@@ -872,7 +872,7 @@ impl Interpreter {
                                 seen.push(name.clone());
                                 state = Keyword;
                             } else {
-                                error!(span, "Unexpected keyword argument: `{}`", name);
+                                error!(span, "Unexpected keyword  in {}: `{}`", func.name, name);
                             }
                         }
                         None => {
@@ -895,7 +895,7 @@ impl Interpreter {
                                 variadic.push(arg.clone());
                                 state = ArgumentType::Variadic;
                             } else {
-                                error!(span, "Unexpected positional argument");
+                                error!(span, "Unexpected positional argument in {}", func.name);
                             }
                         }
                     }
