@@ -22,7 +22,7 @@ pub fn print(
         if i != 0 {
             print!(" ");
         }
-        print!("{:?}", arg)
+        print!("{:#?}", arg)
     }
     println!();
     Ok(Value::Nothing)
@@ -642,3 +642,4 @@ pub fn randi(
     let random = state.borrow_mut().next() as i64;
     Ok(Value::Integer(min + if random > 0 { random } else { -random } % (max - min)))
 }
+
