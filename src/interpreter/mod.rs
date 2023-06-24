@@ -9,12 +9,13 @@ use crate::ast::{ArgumentType, CallArgs, AST};
 use crate::common::{make, Ref, Span};
 use crate::error::{runtime_error as error, Result};
 use crate::interpreter::value::{
-    builtin, CallArgValues, Class, ClassInstance, Function, IteratorValue, Value,
+    builtin, CallArgValues, Class, ClassInstance, Function, IteratorValue, Value, Enum
 };
 use std::collections::HashMap;
 use std::io::Read;
 use std::ops::Deref;
 use std::rc::Rc;
+use crate::interpreter::value::Value::EnumVariant;
 
 mod builtin;
 mod random;
@@ -246,6 +247,22 @@ impl Interpreter {
             AST::FieldAccess(span, obj, field) => {
                 let obj = self.run(obj, scope)?;
                 obj.get_field(span, field)?
+            }
+            AST::Enum(span, name, variants) => {
+                let _variants = HashMap::new();
+                let _enum = make!(Enum {
+                    span: *span,
+                    name: name.clone(),
+                    variants: _variants,
+                });
+                variants.iter().for_each(|(name, id)| {
+                    _enum.borrow_mut().variants.insert(
+                        name.clone(),
+                        EnumVariant(_enum.clone(), name.clone(), *id)
+                    );
+                });
+                scope.borrow_mut().insert(name, Value::Enum(_enum), false, span)?;
+                Value::Nothing
             }
             AST::Class {
                 span,

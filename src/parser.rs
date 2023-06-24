@@ -597,6 +597,38 @@ impl Parser {
                 )))
             }
             Token {
+                kind: TokenKind::Enum,
+                span,
+                ..
+            } => {
+                self.increment();
+                let ident = self.consume(TokenKind::Identifier)?;
+                self.consume(TokenKind::LeftBrace)?;
+                let mut variants = Vec::new();
+                loop {
+                    let variant = self.consume(TokenKind::Identifier)?;
+                    variants.push((variant.text, variants.len()));
+                    match self.cur().kind {
+                        TokenKind::Comma => {
+                            self.increment();
+                        }
+                        TokenKind::RightBrace => {
+                            break;
+                        }
+                        _ => {
+                            error!(self.cur().span, "Expected ',' or '}}'");
+                        }
+                    }
+                }
+                let end = self.consume(TokenKind::RightBrace)?.span;
+                self.consume_line_end_until(until)?;
+                Ok(Rc::new(AST::Enum(
+                    span.extend(&end),
+                    ident.text,
+                    variants,
+                )))
+            }
+            Token {
                 kind: TokenKind::If,
                 span,
                 ..

@@ -162,6 +162,12 @@ impl ClassInstance {
     }
 }
 
+pub struct Enum {
+    pub span: Span,
+    pub name: String,
+    pub variants: HashMap<String, Value>,
+}
+
 pub type CallArgValues = Vec<(Option<String>, Value)>;
 pub type BuiltInFunctionType = fn(&mut Interpreter, Ref<Scope>, &Span, Vec<Value>) -> Result<Value>;
 
@@ -199,6 +205,8 @@ pub enum Value {
     Dict(Ref<HashMap<Value, Value>>),
     String(Rc<String>),
     Namespace(Span, String, Ref<Scope>),
+    Enum(Ref<Enum>),
+    EnumVariant(Ref<Enum>, String, usize),
     RandomState(Ref<RandomState>),
 }
 
@@ -241,6 +249,10 @@ impl Hash for Value {
             }
             Value::Tuple(tuple) => tuple.borrow().iter().for_each(|item| item.hash(state)),
             Value::Dict(items) => items.borrow().iter().for_each(|item| item.hash(state)),
+            Value::EnumVariant(_enum, _, id) => {
+                _enum.as_ptr().hash(state);
+                id.hash(state);
+            }
             _ => unreachable!("{} is not hashable", self.type_of()),
         }
     }
@@ -292,6 +304,8 @@ impl std::fmt::Debug for Value {
             }
             Value::Namespace(_, name, _) => write!(f, "<namespace {}>", name),
             Value::RandomState(_) => write!(f, "<random-state>"),
+            Value::Enum(_) => write!(f, "<enum>"),
+            Value::EnumVariant(_enum, name, id) => write!(f, "<enum-variant {}::{} of {}>", name, id, _enum.borrow().name),
         }
     }
 }
@@ -360,6 +374,10 @@ impl std::cmp::PartialEq for Value {
                     })
                 }
             }
+            (Value::EnumVariant(left_enum, left_name, left_id), Value::EnumVariant(right_enum, right_name, right_id)) => {
+                left_enum.as_ptr() == right_enum.as_ptr() && left_name == right_name && left_id == right_id
+            }
+            (Value::Enum(left), Value::Enum(right)) => left.as_ptr() == right.as_ptr(),
             _ => false,
         }
     }
@@ -527,6 +545,17 @@ impl Value {
                 None => {
                     error!(span, "Field '{}' not found on namespace", field);
                 }
+            },
+            Value::Enum(_enum) => match _enum.borrow().variants.get(field) {
+                Some(value) => value.clone(),
+                None => {
+                    error!(span, "Variant '{}' not found on enum", field);
+                }
+            },
+            Value::EnumVariant(_, name, id) => match field.as_str() {
+                "name" => Value::String(Rc::new(name.clone())),
+                "id" => Value::Integer(*id as i64),
+                _ => error!(span, "Field '{}' not found on enum variant", field),
             },
             Value::Class(class) => {
                 let class = class.borrow();
@@ -830,6 +859,8 @@ impl Value {
                 format!("<namespace {}> {:#?}", name, scope.borrow().vars.clone())
             }
             Value::RandomState(_) => "<random-state>".to_string(),
+            Value::Enum(_enum) => format!("<enum {} with {} variants>", _enum.borrow().name, _enum.borrow().variants.len()),
+            Value::EnumVariant(_enum, name, id) => format!("<enum-variant {}::{} of {}>", name, id, _enum.borrow().name),
         }
     }
 
@@ -962,6 +993,7 @@ impl Value {
                 | Value::Array(..)
                 | Value::Tuple(..)
                 | Value::Dict(..)
+                | Value::EnumVariant(..)
         )
     }
 
@@ -984,6 +1016,8 @@ impl Value {
             Value::Iterator(..) => "Iterator",
             Value::Namespace(..) => "Namespace",
             Value::RandomState(..) => "RandomState",
+            Value::EnumVariant(..) => "EnumVariant",
+            Value::Enum(..) => "Enum",
         }
     }
 

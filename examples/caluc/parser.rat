@@ -31,7 +31,7 @@ class Parser {
     }
 
     def next(self) {
-        if self.cur.type != TokenType.EOF {
+        if self.cur.type.id != TokenType.EOF.id {
             self.pos += 1
         }
         self.cur = self.tokens[self.pos]
@@ -52,7 +52,7 @@ class Parser {
     def parse_assignment(self) {
         let left = self.parse_addition()
         if left == nothing return left
-        if self.cur != nothing and self.cur.type == TokenType.Equals {
+        if self.cur != nothing and self.cur.type.id == TokenType.Equals.id {
             self.next()
             let right = self.parse_assignment()
             if right == nothing return right
@@ -72,12 +72,12 @@ class Parser {
     def parse_addition(self) {
         let left = self.parse_multiplication()
         if left == nothing return left
-        while self.cur != nothing and self.cur.type in [TokenType.Plus, TokenType.Minus] {
-            let op = self.cur.type
+        while self.cur != nothing and self.cur.type.id in [TokenType.Plus.id, TokenType.Minus.id] {
+            let op = self.cur.type.id
             self.next()
             let right = self.parse_multiplication()
             if right == nothing return right
-            if op == TokenType.Plus {
+            if op == TokenType.Plus.id {
                 left = interpreter.Add(left, right)
             } else {
                 left = interpreter.Subtract(left, right)
@@ -89,12 +89,12 @@ class Parser {
     def parse_multiplication(self) {
         let left = self.parse_power()
         if left == nothing return left
-        while self.cur != nothing and self.cur.type in [TokenType.Star, TokenType.Slash] {
-            let op = self.cur.type
+        while self.cur != nothing and self.cur.type.id in [TokenType.Star.id, TokenType.Slash.id] {
+            let op = self.cur.type.id
             self.next()
             let right = self.parse_power()
             if right == nothing return right
-            if op == TokenType.Star {
+            if op == TokenType.Star.id {
                 left = interpreter.Multiply(left, right)
             } else {
                 left = interpreter.Divide(left, right)
@@ -106,7 +106,7 @@ class Parser {
     def parse_power(self) {
         let left = self.parse_atom()
         if left == nothing return left
-        while self.cur != nothing and self.cur.type == TokenType.Caret {
+        while self.cur != nothing and self.cur.type.id == TokenType.Caret.id {
             self.next()
             let right = self.parse_power()
             if right == nothing return right
@@ -116,31 +116,31 @@ class Parser {
     }
 
     def parse_atom(self) {
-        if self.cur.type == TokenType.Number {
+        if self.cur.type.id == TokenType.Number.id {
             let num = interpreter.Number(self.cur.data)
             self.next()
             return num
-        } else if self.cur.type == TokenType.Identifier {
+        } else if self.cur.type.id == TokenType.Identifier.id {
             let name = interpreter.Variable(self.cur.data)
             self.next()
             return name
-        } else if self.cur.type == TokenType.LParen {
+        } else if self.cur.type.id == TokenType.LParen.id {
             self.next()
             let expr = self.parse_expression()
             if expr == nothing return expr
-            if self.cur == nothing or self.cur.type != TokenType.RParen {
+            if self.cur == nothing or self.cur.type.id != TokenType.RParen.id {
                 self.error = "Expected closing parenthesis"
                 self.error_recoverable = true
                 return nothing
             }
             self.next()
             return expr
-        } else if self.cur.type == TokenType.EOF {
+        } else if self.cur.type.id == TokenType.EOF.id {
             self.error = "Unexpected end of input"
             self.error_recoverable = true
             return nothing
         }
-        self.error = `Unexpected token {self.cur.type}`
+        self.error = `Unexpected token {self.cur.type.id}`
         return nothing
     }
 }

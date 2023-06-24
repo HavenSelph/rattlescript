@@ -33,7 +33,7 @@ def parse_until_complete() {
         let temp = input(prompt)
         prompt = "Caluc ... "
         inp += temp + "\n"
-        if inp == "exit" {
+        if temp == "exit" {
             exit()
         }
 

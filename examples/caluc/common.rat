@@ -12,23 +12,22 @@ class Token {
     def repr(self) => `Token({self.type}, {self.data})`
 }
 
-namespace TokenType {
-    // This is a hack to kind of emulate an enum
-    let Identifier = 0
-    let Number = 1
-    let String = 2
+enum TokenType {
+    Identifier,
+    Number,
+    String,
 
-    let Plus = 3
-    let Minus = 4
-    let Star = 5
-    let Slash = 6
-    let Caret = 7
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Caret,
 
-    let LParen = 8
-    let RParen = 9
-    let Equals = 10
+    LParen,
+    RParen,
+    Equals,
 
-    let EOF = 11
+    EOF
 }
 
 let chars = {

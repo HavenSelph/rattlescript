@@ -22,6 +22,10 @@ class Variable {
     }
 
     def run(self, ctx) {
+        if not (self.name in ctx) {
+            print(`Variable {self.name} not found`)
+            return 0
+        }
         return ctx[self.name]
     }
 }

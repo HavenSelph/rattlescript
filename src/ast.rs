@@ -95,6 +95,7 @@ pub enum AST {
     Continue(Span),
     Break(Span),
     ForEach(Span, String, Rc<AST>, Rc<AST>),
+    Enum(Span, String, Vec<(String, usize)>),
     For {
         span: Span,
         init: Option<Rc<AST>>,
@@ -182,6 +183,7 @@ impl AST {
             AST::Namespace { span, .. } => span,
             AST::StarExpression(span, ..) => span,
             AST::StarStarExpression(span, ..) => span,
+            AST::Enum(span, ..) => span,
         }
     }
 }
@@ -359,6 +361,16 @@ impl std::fmt::Display for AST {
             }
             AST::StarExpression(_, expr) => write!(f, "*{}", expr),
             AST::StarStarExpression(_, expr) => write!(f, "**{}", expr),
+            AST::Enum(_, name, variants) => {
+                write!(f, "enum {} {{", name)?;
+                for (i, variant) in variants.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}:{}", variant.0, variant.1)?;
+                }
+                write!(f, "}}")
+            }
         }
     }
 }
