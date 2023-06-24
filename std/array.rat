@@ -19,29 +19,30 @@ def all(arr) {
 }
 
 def sum(arr) {
-    var total = 0
+    let total = 0
     for num in arr {
         total += num
     }
-    total
+    return total
 }
 
 def max(arr) {
-    var max = arr[0]
+    // [1,2,3,4]
+    let max = arr[0]
     for num in arr {
         if num > max {
             max = num
         }
     }
-    max
+    return max
 }
 
 def min(arr) {
-    var min = arr[0]
+    let min = arr[0]
     for num in arr {
         if num < min {
             min = num
         }
     }
-    min
+    return min
 }

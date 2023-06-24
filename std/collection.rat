@@ -11,6 +11,16 @@ class Counter {
         }
     }
 
+    def percentages(self) {
+        // Return a dictionary of the form {item: percentage}
+        // for each item in the array.
+        let percentages = {}
+        for item in self.count.keys() {
+            percentages[item] = (self.count[item] / self.arr.len()) * 100
+        }
+        return percentages
+    }
+
     def most_common(self) {
         // Return the most common item in the array.
         // If there is a tie, the first item is returned.

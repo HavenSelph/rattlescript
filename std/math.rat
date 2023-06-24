@@ -7,6 +7,7 @@ let e = 2.718281828459045
 // Helper functions
 def max(*args) => max_a(args)
 def min(*args) => min_a(args)
+def pow(x, y) => x ** y
 
 def factorial(n) {
     if n == 0 {
