@@ -14,6 +14,7 @@ use crate::interpreter::value::{
 use std::collections::HashMap;
 use std::io::Read;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 mod builtin;
@@ -22,14 +23,25 @@ pub mod value;
 
 #[derive(Debug)]
 pub struct Scope {
+    pub global_scope: Ref<GlobalScope>,
     pub vars: HashMap<String, Value>,
     pub parent: Option<Ref<Scope>>,
     pub in_function: bool,
 }
 
+#[derive(Default, Debug)]
+pub struct GlobalScope {
+    files: HashMap<PathBuf, Ref<Scope>>,
+}
+
 impl Scope {
-    pub fn new(parent: Option<Ref<Scope>>, in_function: bool) -> Ref<Scope> {
+    pub fn new(
+        global_scope: Ref<GlobalScope>,
+        parent: Option<Ref<Scope>>,
+        in_function: bool,
+    ) -> Ref<Scope> {
         make!(Scope {
+            global_scope,
             vars: HashMap::new(),
             parent,
             in_function,
@@ -70,23 +82,66 @@ enum ControlFlow {
 
 pub struct Interpreter {
     control_flow: ControlFlow,
+    global_scope: Ref<GlobalScope>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
+            global_scope: make!(GlobalScope::default()),
             control_flow: ControlFlow::None,
         }
     }
 
+    pub fn global_scope(&self) -> Ref<GlobalScope> {
+        self.global_scope.clone()
+    }
+
+    pub fn cache_import(&mut self, path: &PathBuf, scope: Ref<Scope>) {
+        self.global_scope
+            .borrow_mut()
+            .files
+            .insert(path.clone(), scope);
+    }
+
+    pub fn resolve_import(&mut self, span: &Span, path: &str) -> Ref<Scope> {
+        let Ok(absolute_path) = std::fs::canonicalize(path) else {
+            return self.run_file(span, path).unwrap_or(Scope::new(
+                self.global_scope.clone(),
+                None,
+                false,
+            ));
+        };
+
+        // Using cached results of evaluation
+        if let Some(imported_file_scope) = self
+            .global_scope
+            .borrow()
+            .files
+            .get(&absolute_path)
+            .cloned()
+        {
+            return imported_file_scope;
+        }
+
+        // If program fails - empty scope
+        let imported_file_scope =
+            self.run_file(span, path)
+                .unwrap_or(Scope::new(self.global_scope.clone(), None, false));
+
+        self.cache_import(&absolute_path, imported_file_scope.clone());
+
+        imported_file_scope
+    }
+
     pub fn run_and_return_scope(&mut self, ast: &Rc<AST>) -> Result<Ref<Scope>> {
-        let scope = Scope::new(None, false);
+        let scope = Scope::new(self.global_scope.clone(), None, false);
         self.run_block_without_new_scope(ast, scope.clone())?;
         Ok(scope)
     }
 
     pub fn execute(&mut self, ast: &Rc<AST>) -> Result<Value> {
-        let scope = Scope::new(None, false);
+        let scope = Scope::new(self.global_scope.clone(), None, false);
         self.run(ast, scope)
     }
 
@@ -170,7 +225,11 @@ impl Interpreter {
                         match right {
                             Value::Boolean(true) => return Ok(right),
                             Value::Boolean(false) => return Ok(right),
-                            _ => error!(_right.span(), "Expected boolean, but got {}", right.type_of()),
+                            _ => error!(
+                                _right.span(),
+                                "Expected boolean, but got {}",
+                                right.type_of()
+                            ),
                         }
                     }
                     _ => error!(_left.span(), "Expected boolean, but got {}", left.type_of()),
@@ -186,7 +245,11 @@ impl Interpreter {
                         match right {
                             Value::Boolean(true) => return Ok(right),
                             Value::Boolean(false) => return Ok(right),
-                            _ => error!(_right.span(), "Expected boolean, but got {}", right.type_of()),
+                            _ => error!(
+                                _right.span(),
+                                "Expected boolean, but got {}",
+                                right.type_of()
+                            ),
                         }
                     }
                     _ => error!(_left.span(), "Expected boolean, but got {}", left.type_of()),
@@ -333,12 +396,20 @@ impl Interpreter {
             }
 
             AST::Block(..) => {
-                let block_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
+                let block_scope = Scope::new(
+                    self.global_scope.clone(),
+                    Some(scope.clone()),
+                    scope.borrow().in_function,
+                );
                 self.run_block_without_new_scope(ast, block_scope)?
             }
             AST::Namespace { span, name, body } => {
                 // Create a new scope for the namespace
-                let namespace_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
+                let namespace_scope = Scope::new(
+                    self.global_scope.clone(),
+                    Some(scope.clone()),
+                    scope.borrow().in_function,
+                );
 
                 // Run the namespace body
                 self.run_block_without_new_scope(body, namespace_scope.clone())?;
@@ -440,8 +511,11 @@ impl Interpreter {
                     Value::Iterator(IteratorValue(iter)) => {
                         let iter = &mut *(*iter).borrow_mut();
                         for val in iter {
-                            let loop_scope =
-                                Scope::new(Some(scope.clone()), scope.borrow().in_function);
+                            let loop_scope = Scope::new(
+                                self.global_scope.clone(),
+                                Some(scope.clone()),
+                                scope.borrow().in_function,
+                            );
                             loop_scope
                                 .borrow_mut()
                                 .insert(loop_var, val.clone(), false, span)?;
@@ -469,8 +543,11 @@ impl Interpreter {
                         let iter = &mut *(*iter).borrow_mut();
                         let mut vec = Vec::new();
                         for val in iter {
-                            let loop_scope =
-                                Scope::new(Some(scope.clone()), scope.borrow().in_function);
+                            let loop_scope = Scope::new(
+                                self.global_scope.clone(),
+                                Some(scope.clone()),
+                                scope.borrow().in_function,
+                            );
                             loop_scope
                                 .borrow_mut()
                                 .insert(var, val.clone(), false, span)?;
@@ -499,7 +576,11 @@ impl Interpreter {
                 step,
                 body,
             } => {
-                let loop_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
+                let loop_scope = Scope::new(
+                    self.global_scope.clone(),
+                    Some(scope.clone()),
+                    scope.borrow().in_function,
+                );
                 if let Some(init) = init {
                     self.run(init, loop_scope.clone())?;
                 }
@@ -606,7 +687,6 @@ impl Interpreter {
                 Value::Dict(make!(map))
             }
             AST::Import { span, path, alias } => {
-                let program = self.run_file(span, path)?;
                 let name = match alias {
                     Some(name) => name.clone(),
                     None => {
@@ -620,23 +700,33 @@ impl Interpreter {
                             .to_string()
                     }
                 };
-                let program = Value::Namespace(*span, name.clone(), program);
-                scope
-                    .borrow_mut()
-                    .insert(name.as_str(), program, false, span)?;
+
+                scope.borrow_mut().insert(
+                    &name,
+                    Value::Namespace(*span, name.to_owned(), self.resolve_import(span, path)),
+                    false,
+                    span,
+                )?;
+
                 Value::Nothing
             }
             AST::FromImport { span, path, names } => {
-                let program = self.run_file(span, path)?;
-                if names.first().expect("Import object is empty").0 == "*" { // Merge scopes
-                    scope.borrow_mut().vars.extend(program.borrow().vars.clone());
-                } else { // Insert all names into scope
+                let imported_file_scope = self.resolve_import(span, path);
+
+                if names.first().expect("Import object is empty").0 == "*" {
+                    // Merge scopes
+                    scope
+                        .borrow_mut()
+                        .vars
+                        .extend(imported_file_scope.borrow().vars.clone());
+                } else {
+                    // Insert all names into scope
                     for (name, alias) in names {
                         let alias = match alias {
                             Some(alias) => alias,
                             None => name,
                         };
-                        let value = match program.borrow().get(name.as_str()) {
+                        let value = match imported_file_scope.borrow().get(name.as_str()) {
                             Some(value) => value.clone(),
                             None => error!(span, "Variable `{}` doesn't exist", name),
                         };
@@ -645,6 +735,7 @@ impl Interpreter {
                             .insert(alias.as_str(), value, false, span)?;
                     }
                 }
+
                 Value::Nothing
             }
             AST::StarExpression(span, _) => error!(span, "Star expressions cannot be used here."),
@@ -818,7 +909,11 @@ impl Interpreter {
             Value::Function(func) => {
                 // Setup scope
 
-                let run_scope = Scope::new(Some(func.borrow().scope.clone()), true);
+                let run_scope = Scope::new(
+                    self.global_scope.clone(),
+                    Some(func.borrow().scope.clone()),
+                    true,
+                );
 
                 // This will always inject parent if it exists, meaning even if function is not a class method.
                 // if let Some(parent) = parent {
@@ -947,7 +1042,7 @@ impl Interpreter {
                 value
             }
             Value::BuiltInFunction(func) => {
-                let run_scope = Scope::new(Some(scope), true);
+                let run_scope = Scope::new(self.global_scope.clone(), Some(scope), true);
                 let mut args: Vec<Value> = args.iter().map(|(_, arg)| arg.clone()).collect();
                 if let Some(parent) = parent {
                     args.insert(0, parent);

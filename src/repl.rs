@@ -29,17 +29,18 @@ pub const REPL_VERSION: &str = "1.0.0";
 
 pub struct Repl {
     interpreter: Interpreter,
-    global_scope: Ref<Scope>,
+    repl_scope: Ref<Scope>,
     verbose: bool,
 }
 
 impl Repl {
     pub fn new(verbose: bool) -> Repl {
         let interpreter = Interpreter::new();
-        let global_scope = Scope::new(None, false);
+        let global_scope = interpreter.global_scope();
+
         Repl {
             interpreter,
-            global_scope,
+            repl_scope: Scope::new(global_scope, None, false),
             verbose,
         }
     }
@@ -77,7 +78,7 @@ impl Repl {
 
         let val = self
             .interpreter
-            .run_block_without_new_scope(&ast, self.global_scope.clone())?;
+            .run_block_without_new_scope(&ast, self.repl_scope.clone())?;
         match &val {
             Value::Nothing => {}
             _ => println!("{}", val.repr()),

@@ -1,0 +1,4 @@
+import import_caching_test.test
+from import_caching_test.test import add // doesn't rerun the file
+
+print(add(1, 2))
