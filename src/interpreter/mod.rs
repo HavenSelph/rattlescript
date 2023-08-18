@@ -23,25 +23,14 @@ pub mod value;
 
 #[derive(Debug)]
 pub struct Scope {
-    pub global_scope: Ref<GlobalScope>,
     pub vars: HashMap<String, Value>,
     pub parent: Option<Ref<Scope>>,
     pub in_function: bool,
 }
 
-#[derive(Default, Debug)]
-pub struct GlobalScope {
-    files: HashMap<PathBuf, Ref<Scope>>,
-}
-
 impl Scope {
-    pub fn new(
-        global_scope: Ref<GlobalScope>,
-        parent: Option<Ref<Scope>>,
-        in_function: bool,
-    ) -> Ref<Scope> {
+    pub fn new(parent: Option<Ref<Scope>>, in_function: bool) -> Ref<Scope> {
         make!(Scope {
-            global_scope,
             vars: HashMap::new(),
             parent,
             in_function,
@@ -82,52 +71,38 @@ enum ControlFlow {
 
 pub struct Interpreter {
     control_flow: ControlFlow,
-    global_scope: Ref<GlobalScope>,
+    processed_imported_files: HashMap<PathBuf, Ref<Scope>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            global_scope: make!(GlobalScope::default()),
             control_flow: ControlFlow::None,
+            processed_imported_files: HashMap::new(),
         }
     }
 
-    pub fn global_scope(&self) -> Ref<GlobalScope> {
-        self.global_scope.clone()
-    }
-
     pub fn cache_import(&mut self, path: &PathBuf, scope: Ref<Scope>) {
-        self.global_scope
-            .borrow_mut()
-            .files
-            .insert(path.clone(), scope);
+        self.processed_imported_files.insert(path.clone(), scope);
     }
 
     pub fn resolve_import(&mut self, span: &Span, path: &str) -> Ref<Scope> {
         let Ok(absolute_path) = std::fs::canonicalize(path) else {
             return self.run_file(span, path).unwrap_or(Scope::new(
-                self.global_scope.clone(),
                 None,
                 false,
             ));
         };
 
         // Using cached results of evaluation
-        if let Some(imported_file_scope) = self
-            .global_scope
-            .borrow()
-            .files
-            .get(&absolute_path)
-            .cloned()
+        if let Some(imported_file_scope) =
+            self.processed_imported_files.get(&absolute_path).cloned()
         {
             return imported_file_scope;
         }
 
         // If program fails - empty scope
-        let imported_file_scope =
-            self.run_file(span, path)
-                .unwrap_or(Scope::new(self.global_scope.clone(), None, false));
+        let imported_file_scope = self.run_file(span, path).unwrap_or(Scope::new(None, false));
 
         self.cache_import(&absolute_path, imported_file_scope.clone());
 
@@ -135,13 +110,13 @@ impl Interpreter {
     }
 
     pub fn run_and_return_scope(&mut self, ast: &Rc<AST>) -> Result<Ref<Scope>> {
-        let scope = Scope::new(self.global_scope.clone(), None, false);
+        let scope = Scope::new(None, false);
         self.run_block_without_new_scope(ast, scope.clone())?;
         Ok(scope)
     }
 
     pub fn execute(&mut self, ast: &Rc<AST>) -> Result<Value> {
-        let scope = Scope::new(self.global_scope.clone(), None, false);
+        let scope = Scope::new(None, false);
         self.run(ast, scope)
     }
 
@@ -396,20 +371,12 @@ impl Interpreter {
             }
 
             AST::Block(..) => {
-                let block_scope = Scope::new(
-                    self.global_scope.clone(),
-                    Some(scope.clone()),
-                    scope.borrow().in_function,
-                );
+                let block_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
                 self.run_block_without_new_scope(ast, block_scope)?
             }
             AST::Namespace { span, name, body } => {
                 // Create a new scope for the namespace
-                let namespace_scope = Scope::new(
-                    self.global_scope.clone(),
-                    Some(scope.clone()),
-                    scope.borrow().in_function,
-                );
+                let namespace_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
 
                 // Run the namespace body
                 self.run_block_without_new_scope(body, namespace_scope.clone())?;
@@ -511,11 +478,8 @@ impl Interpreter {
                     Value::Iterator(IteratorValue(iter)) => {
                         let iter = &mut *(*iter).borrow_mut();
                         for val in iter {
-                            let loop_scope = Scope::new(
-                                self.global_scope.clone(),
-                                Some(scope.clone()),
-                                scope.borrow().in_function,
-                            );
+                            let loop_scope =
+                                Scope::new(Some(scope.clone()), scope.borrow().in_function);
                             loop_scope
                                 .borrow_mut()
                                 .insert(loop_var, val.clone(), false, span)?;
@@ -543,11 +507,8 @@ impl Interpreter {
                         let iter = &mut *(*iter).borrow_mut();
                         let mut vec = Vec::new();
                         for val in iter {
-                            let loop_scope = Scope::new(
-                                self.global_scope.clone(),
-                                Some(scope.clone()),
-                                scope.borrow().in_function,
-                            );
+                            let loop_scope =
+                                Scope::new(Some(scope.clone()), scope.borrow().in_function);
                             loop_scope
                                 .borrow_mut()
                                 .insert(var, val.clone(), false, span)?;
@@ -576,11 +537,7 @@ impl Interpreter {
                 step,
                 body,
             } => {
-                let loop_scope = Scope::new(
-                    self.global_scope.clone(),
-                    Some(scope.clone()),
-                    scope.borrow().in_function,
-                );
+                let loop_scope = Scope::new(Some(scope.clone()), scope.borrow().in_function);
                 if let Some(init) = init {
                     self.run(init, loop_scope.clone())?;
                 }
@@ -909,11 +866,7 @@ impl Interpreter {
             Value::Function(func) => {
                 // Setup scope
 
-                let run_scope = Scope::new(
-                    self.global_scope.clone(),
-                    Some(func.borrow().scope.clone()),
-                    true,
-                );
+                let run_scope = Scope::new(Some(func.borrow().scope.clone()), true);
 
                 // This will always inject parent if it exists, meaning even if function is not a class method.
                 // if let Some(parent) = parent {
@@ -1042,7 +995,7 @@ impl Interpreter {
                 value
             }
             Value::BuiltInFunction(func) => {
-                let run_scope = Scope::new(self.global_scope.clone(), Some(scope), true);
+                let run_scope = Scope::new(Some(scope), true);
                 let mut args: Vec<Value> = args.iter().map(|(_, arg)| arg.clone()).collect();
                 if let Some(parent) = parent {
                     args.insert(0, parent);
