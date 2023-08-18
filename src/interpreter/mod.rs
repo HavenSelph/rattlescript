@@ -14,6 +14,7 @@ use crate::interpreter::value::{
 use std::collections::HashMap;
 use std::io::Read;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 mod builtin;
@@ -70,13 +71,42 @@ enum ControlFlow {
 
 pub struct Interpreter {
     control_flow: ControlFlow,
+    processed_imported_files: HashMap<PathBuf, Ref<Scope>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
             control_flow: ControlFlow::None,
+            processed_imported_files: HashMap::new(),
         }
+    }
+
+    pub fn cache_import(&mut self, path: &PathBuf, scope: Ref<Scope>) {
+        self.processed_imported_files.insert(path.clone(), scope);
+    }
+
+    pub fn resolve_import(&mut self, span: &Span, path: &str) -> Ref<Scope> {
+        let Ok(absolute_path) = std::fs::canonicalize(path) else {
+            return self.run_file(span, path).unwrap_or(Scope::new(
+                None,
+                false,
+            ));
+        };
+
+        // Using cached results of evaluation
+        if let Some(imported_file_scope) =
+            self.processed_imported_files.get(&absolute_path).cloned()
+        {
+            return imported_file_scope;
+        }
+
+        // If program fails - empty scope
+        let imported_file_scope = self.run_file(span, path).unwrap_or(Scope::new(None, false));
+
+        self.cache_import(&absolute_path, imported_file_scope.clone());
+
+        imported_file_scope
     }
 
     pub fn run_and_return_scope(&mut self, ast: &Rc<AST>) -> Result<Ref<Scope>> {
@@ -170,7 +200,11 @@ impl Interpreter {
                         match right {
                             Value::Boolean(true) => return Ok(right),
                             Value::Boolean(false) => return Ok(right),
-                            _ => error!(_right.span(), "Expected boolean, but got {}", right.type_of()),
+                            _ => error!(
+                                _right.span(),
+                                "Expected boolean, but got {}",
+                                right.type_of()
+                            ),
                         }
                     }
                     _ => error!(_left.span(), "Expected boolean, but got {}", left.type_of()),
@@ -186,7 +220,11 @@ impl Interpreter {
                         match right {
                             Value::Boolean(true) => return Ok(right),
                             Value::Boolean(false) => return Ok(right),
-                            _ => error!(_right.span(), "Expected boolean, but got {}", right.type_of()),
+                            _ => error!(
+                                _right.span(),
+                                "Expected boolean, but got {}",
+                                right.type_of()
+                            ),
                         }
                     }
                     _ => error!(_left.span(), "Expected boolean, but got {}", left.type_of()),
@@ -606,7 +644,6 @@ impl Interpreter {
                 Value::Dict(make!(map))
             }
             AST::Import { span, path, alias } => {
-                let program = self.run_file(span, path)?;
                 let name = match alias {
                     Some(name) => name.clone(),
                     None => {
@@ -620,23 +657,33 @@ impl Interpreter {
                             .to_string()
                     }
                 };
-                let program = Value::Namespace(*span, name.clone(), program);
-                scope
-                    .borrow_mut()
-                    .insert(name.as_str(), program, false, span)?;
+
+                scope.borrow_mut().insert(
+                    &name,
+                    Value::Namespace(*span, name.to_owned(), self.resolve_import(span, path)),
+                    false,
+                    span,
+                )?;
+
                 Value::Nothing
             }
             AST::FromImport { span, path, names } => {
-                let program = self.run_file(span, path)?;
-                if names.first().expect("Import object is empty").0 == "*" { // Merge scopes
-                    scope.borrow_mut().vars.extend(program.borrow().vars.clone());
-                } else { // Insert all names into scope
+                let imported_file_scope = self.resolve_import(span, path);
+
+                if names.first().expect("Import object is empty").0 == "*" {
+                    // Merge scopes
+                    scope
+                        .borrow_mut()
+                        .vars
+                        .extend(imported_file_scope.borrow().vars.clone());
+                } else {
+                    // Insert all names into scope
                     for (name, alias) in names {
                         let alias = match alias {
                             Some(alias) => alias,
                             None => name,
                         };
-                        let value = match program.borrow().get(name.as_str()) {
+                        let value = match imported_file_scope.borrow().get(name.as_str()) {
                             Some(value) => value.clone(),
                             None => error!(span, "Variable `{}` doesn't exist", name),
                         };
@@ -645,6 +692,7 @@ impl Interpreter {
                             .insert(alias.as_str(), value, false, span)?;
                     }
                 }
+
                 Value::Nothing
             }
             AST::StarExpression(span, _) => error!(span, "Star expressions cannot be used here."),

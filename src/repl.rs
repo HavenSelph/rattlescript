@@ -36,10 +36,10 @@ pub struct Repl {
 impl Repl {
     pub fn new(verbose: bool) -> Repl {
         let interpreter = Interpreter::new();
-        let global_scope = Scope::new(None, false);
+
         Repl {
             interpreter,
-            global_scope,
+            global_scope: Scope::new(None, false),
             verbose,
         }
     }
