@@ -1,4 +1,4 @@
-// out: "hello, test.rat have just been run!\n3"
+/// out: "hello, test.rat have just been run!\n3"
 
 import import_caching_test.test
 from import_caching_test.test import add // doesn't rerun the file
